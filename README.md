@@ -584,5 +584,5 @@ And cite the underlying data sources:
 
 ---
 
-*For questions about this pipeline, refer to the accompanying LaTeX
-documentation which describes every construction decision in full detail.*
+*For questions about this pipeline, refer to the accompanying pdf
+documentation `CPZ Data_Reconstruction and Extension Report.pdf` which describes every construction decision in full detail.*

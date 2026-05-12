@@ -1,0 +1,26 @@
+# Stage 00 CPZ/FNW data reconstruction config.
+#
+# This matches the previous working notebooks' file layout:
+#   raw intermediates: C:/Users/amosa/ml4t_data/raw
+#   final splits:      C:/Users/amosa/ml4t_data/extended_v2
+#   repo diagnostics:  data/foundation
+
+raw_dir: "C:/Users/amosa/ml4t_data/raw"
+output_dir: "C:/Users/amosa/ml4t_data/extended_v2"
+foundation_dir: "data/foundation"
+cpz_reference_path: "C:/Users/amosa/ml4t_data/academic/firm_characteristics_all.parquet"
+
+crsp_monthly_start: "1960-01-01"
+crsp_monthly_end: "2024-12-31"
+crsp_daily_start: "1963-01-01"
+crsp_daily_end: "2024-12-31"
+compustat_start: "1960-01-01"
+compustat_end: "2024-12-31"
+sample_start: "1967-01-01"
+sample_end: "2024-12-31"
+
+pit_tolerance_days: 380
+exclude_financials: true
+nyse_amex_delist_return: -0.30
+nasdaq_delist_return: -0.55
+

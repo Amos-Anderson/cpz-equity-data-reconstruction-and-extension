@@ -192,7 +192,7 @@ If you use this package in research, please cite:
   title={Data Construction: Fundamental Factor Pipeline for US Equities},
   author={Anderson, Amos},
   year={2026},
-  url={https://github.com/yourusername/data-construction}
+  url={https://github.com/Amos-Anderson/cpz-equity-data-reconstruction-and-extension}
 }
 ```
 

@@ -1,11 +1,5 @@
 # 00 DATA FOUNDATION DOC3 VALIDATION
 
-> **Note for Kimi (or any non-LaTeX-capable platform)**:
-> This is a Markdown conversion of the original LaTeX file
-> `00_data_foundation_doc3_validation.tex`. Math is in `$...$` (inline) or `$$...$$` (display)
-> notation. Tables and equations are best-effort conversions —
-> the LaTeX source is the canonical version when available.
-
 ---
 
 

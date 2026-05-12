@@ -1,0 +1,1190 @@
+% =============================================================================
+% Stage 0 — Document 2: The 46 Characteristics
+%
+% Mathematical definitions of all 46 firm characteristics in the panel.
+% Organized by family. For each characteristic:
+%   - Definition (LaTeX equation)
+%   - Required inputs (CRSP/Compustat fields)
+%   - Reference (academic origin)
+%   - Sign convention (predicted return relationship)
+%   - Known issues (where applicable)
+%
+% This document depends on Document 1 (methodology) and is referenced by
+% Document 3 (validation).
+% =============================================================================
+
+\section{Stage 0 (cont.): Characteristic Definitions}
+\label{sec:stage0-chars}
+
+\subsection{Overview and Notation}
+\label{subsec:stage0-chars-overview}
+
+Document 1 established the methodological scaffolding: data sources,
+PIT mechanics, the Davis-Fama-French book equity construction, the
+Shumway delisting adjustment, the Roll spread derivation, and the
+rank-normalization that produces our final outputs. Document 2 specifies
+the construction formulas for the 46 firm characteristics that populate
+the panel.
+
+The 46 characteristics decompose into seven families based on economic
+content:
+
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Family} & \textbf{Count} & \textbf{Members} \\
+\midrule
+Value & 6 & BEME, E2P, CF2P, D2P, S2P, A2ME \\
+Profitability & 7 & PROF, ROE, ROA, OP, PM, PCM, RNA \\
+Investment & 6 & Investment, NOA, DPI2A, NI, OA, AC \\
+Momentum & 8 & r12\_2, r2\_1, r12\_7, r36\_13, ST\_REV, LT\_Rev, SUV, Rel2High \\
+Risk & 5 & Beta, MktBeta, IdioVol, Resid\_Var, Variance \\
+Liquidity & 3 & Spread, LTurnover, LME \\
+Other & 11 & Q, C, CF, AT, ATO, CTO, D2A, FC2Y, Lev, OL, SGA2S \\
+\midrule
+\textbf{Total} & \textbf{46} & \\
+\bottomrule
+\end{tabular}
+\caption{The 46 characteristics in the CPZ-extended panel, organized by
+economic family.}
+\label{tab:char-families}
+\end{table}
+
+The "Other" family is heterogeneous: it contains size (AT), Tobin's Q,
+cash-to-assets, leverage variants, and turnover-style measures that do
+not fit cleanly into the other six families.
+
+Notation conventions for the rest of this document:
+
+\begin{itemize}
+\item $i$ indexes firms (CRSP \texttt{permno}); $t$ indexes time
+      (month-end for monthly data, fiscal-year-end for annual).
+\item $r_{i,t}$ denotes the raw monthly return; $r^{ex}_{i,t}$ the
+      excess return after subtracting the risk-free rate.
+\item $\mathrm{ME}_{i,t}$ denotes month-end market equity in dollars
+      (eq.~\ref{eq:me-defn} in Document 1).
+\item $\mathrm{BE}_{i,t}$ denotes Davis-Fama-French book equity
+      (eq.~\ref{eq:be-defn} in Document 1).
+\item Compustat balance-sheet items are denoted by their lowercase
+      Compustat names (e.g., \texttt{at}, \texttt{ib}, \texttt{cogs}).
+\item For an annual Compustat item observed at fiscal year-end,
+      $X_{i,t-1}$ denotes the value from the previous fiscal year.
+\item All ME-dependent ratios (Value family) use \emph{contemporaneous}
+      market equity at the panel month-end, paired with the PIT-merged
+      accounting numerator. The numerator's \texttt{avail\_date} must
+      be $\le$ the panel month-end (i.e., already public).
+\item For monthly (price-based) characteristics, signals at month $t$
+      use information observable through month-end $t$.
+\end{itemize}
+
+The "Sign convention" rows in each subsection state the predicted
+correlation between the characteristic and forward returns following
+the published source. Positive ($+$) means high values predict positive
+returns; negative ($-$) means high values predict negative returns.
+These are theoretical predictions; empirical signs in our sample are
+established in Stage 3 (factor diagnostics).
+
+\subsection{Value Family (6)}
+\label{subsec:stage0-value}
+
+The value family contains characteristics that scale a fundamental
+quantity (book value, earnings, sales, cash flow, dividends, assets) by
+market equity. The economic logic is that low market values relative to
+fundamentals signal undervaluation and predict positive future returns.
+All six are computed at panel-merge time, since the denominator
+$\mathrm{ME}_{i,t}$ is the panel month-end market equity, not the
+\texttt{datadate} value.
+
+\subsubsection{BEME --- Book-to-Market Equity}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{BEME}_{i,t} = \frac{\mathrm{BE}_{i,\tau(t)}}{\mathrm{ME}_{i,t}},
+\label{eq:beme}
+\end{equation}
+where $\tau(t)$ denotes the most recent fiscal year-end with
+$\texttt{avail\_date} \le t$ (i.e., the PIT-merged accounting record).
+
+\textbf{Required inputs:}
+\texttt{seq}, \texttt{ceq}, \texttt{pstk}, \texttt{pstkrv},
+\texttt{pstkl}, \texttt{txditc}, \texttt{at}, \texttt{lt} (for BE);
+\texttt{prc}, \texttt{shrout} (for ME).
+
+\textbf{Reference:} \cite{FamaFrench1992,FamaFrench1993}.
+
+\textbf{Sign convention:} positive. High BEME indicates the market
+values the firm at less than its book equity, the canonical value
+signal.
+
+\textbf{Known issues:} Negative BE (eq.~\ref{eq:be-defn} drops these)
+removes the firm-month from the value-family characteristics. Approximately
+0.5--1.5\% of firm-years have negative BE in modern data; these tend to
+be distressed firms. The completeness filter
+(\S\ref{subsec:stage0-completeness}) drops the firm-month from the
+panel when any characteristic is missing, including BEME.
+
+\subsubsection{E2P --- Earnings-to-Price}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{E2P}_{i,t} = \frac{\mathrm{IB}_{i,\tau(t)}}{\mathrm{ME}_{i,t}}.
+\label{eq:e2p}
+\end{equation}
+where IB is income before extraordinary items.
+
+\textbf{Required inputs:} \texttt{ib}, \texttt{prc}, \texttt{shrout}.
+
+\textbf{Reference:} \cite{Basu1977,FamaFrench1992}.
+
+\textbf{Sign convention:} positive. High earnings yield (low P/E) is a
+classical value signal.
+
+\textbf{Known issues:} Negative IB produces negative E2P. We retain
+negative-earnings firms (do not set NA), since the rank-normalization
+will assign them low cross-sectional ranks, which is the appropriate
+treatment in a long-short factor.
+
+\subsubsection{CF2P --- Cash-Flow-to-Price}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{CF2P}_{i,t} = \frac{\mathrm{IB}_{i,\tau(t)} + \mathrm{DP}_{i,\tau(t)}}
+                            {\mathrm{ME}_{i,t}},
+\label{eq:cf2p}
+\end{equation}
+where DP is depreciation and amortization. The numerator
+$\mathrm{IB} + \mathrm{DP}$ is a commonly-used cash-flow proxy:
+income plus non-cash depreciation.
+
+\textbf{Required inputs:} \texttt{ib}, \texttt{dp}, \texttt{prc},
+\texttt{shrout}.
+
+\textbf{Reference:} \cite{Lakonishok1994}.
+
+\textbf{Sign convention:} positive.
+
+\textbf{Known issues:} As with E2P, negative numerators are retained
+and rank-normalized.
+
+\subsubsection{D2P --- Dividend Yield}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{D2P}_{i,t} = \frac{\mathrm{DV}_{i,\tau(t)}}{\mathrm{ME}_{i,t}},
+\label{eq:d2p}
+\end{equation}
+where DV is total cash dividends paid (Compustat \texttt{dv}).
+
+\textbf{Required inputs:} \texttt{dv}, \texttt{prc}, \texttt{shrout}.
+
+\textbf{Reference:} \cite{LitzenbergerRamaswamy1979,FamaFrench1988}.
+
+\textbf{Sign convention:} positive (mild). Dividend yield is a weak but
+historically positive predictor.
+
+\textbf{Known issues:} Many firms pay no dividends ($\mathrm{DV} = 0$
+or NA). In v2, missing \texttt{dv} is treated as zero, ensuring D2P is
+computable for all firms (potentially equal to zero). This is the
+standard convention for dividend-yield characteristics.
+
+\subsubsection{S2P --- Sales-to-Price}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{S2P}_{i,t} = \frac{\mathrm{SALE}_{i,\tau(t)}}{\mathrm{ME}_{i,t}}.
+\label{eq:s2p}
+\end{equation}
+
+\textbf{Required inputs:} \texttt{sale}, \texttt{prc}, \texttt{shrout}.
+
+\textbf{Reference:} \cite{Barbee1996}.
+
+\textbf{Sign convention:} positive. Like other value ratios, but uses
+sales rather than earnings or book value as the fundamental anchor;
+robust for firms with negative or volatile earnings.
+
+\subsubsection{A2ME --- Assets-to-Market-Equity}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{A2ME}_{i,t} = \frac{\mathrm{AT}_{i,\tau(t)}}{\mathrm{ME}_{i,t}},
+\label{eq:a2me}
+\end{equation}
+where AT is total assets.
+
+\textbf{Required inputs:} \texttt{at}, \texttt{prc}, \texttt{shrout}.
+
+\textbf{Reference:} \cite{BharyMcLean2014}.
+
+\textbf{Sign convention:} positive. Conceptually similar to BEME but
+uses total assets in the numerator instead of book equity. Highly
+correlated with BEME but not identical.
+
+\subsection{Profitability Family (7)}
+\label{subsec:stage0-profitability}
+
+Profitability characteristics measure efficiency at converting inputs
+(revenue, equity, assets) into earnings or operating profits. The
+economic logic is that more profitable firms generate higher returns
+than less profitable firms with similar valuations, controlling for
+risk. All seven are computed from Compustat with the 6-month lag.
+
+\subsubsection{PROF --- Gross Profitability}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{PROF}_{i,t} = \frac{\mathrm{SALE}_{i,t} - \mathrm{COGS}_{i,t}}
+                           {\mathrm{BE}_{i,t}},
+\label{eq:prof}
+\end{equation}
+defined when $\mathrm{BE}_{i,t} > 0$.
+
+\textbf{Required inputs:} \texttt{sale}, \texttt{cogs}, \texttt{seq},
+\texttt{ceq}, \texttt{pstk}, \texttt{pstkrv}, \texttt{pstkl},
+\texttt{txditc}, \texttt{at}, \texttt{lt}.
+
+\textbf{Reference:} \cite{NovyMarx2013}.
+
+\textbf{Sign convention:} positive. Novy-Marx's central finding is that
+gross profitability is an alternative measure of "quality" that predicts
+returns in excess of value and momentum.
+
+\subsubsection{ROE --- Return on Equity}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{ROE}_{i,t} = \frac{\mathrm{IB}_{i,t}}{\mathrm{BE}_{i,t-1}},
+\label{eq:roe}
+\end{equation}
+defined when $\mathrm{BE}_{i,t-1} > 0$. The lagged book equity in the
+denominator follows the standard accounting convention: ROE measures
+the return generated this period on the equity available at the start
+of the period.
+
+\textbf{Required inputs:} \texttt{ib}, current and prior-year
+\texttt{seq}, etc.
+
+\textbf{Reference:} \cite{HouXueZhang2015}.
+
+\textbf{Sign convention:} positive.
+
+\textbf{Known issues:} Requires prior-year BE to be available; the
+first year of a firm's Compustat history will have NA ROE.
+
+\subsubsection{ROA --- Return on Assets}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{ROA}_{i,t} = \frac{\mathrm{IB}_{i,t}}{\mathrm{AT}_{i,t-1}},
+\label{eq:roa}
+\end{equation}
+defined when $\mathrm{AT}_{i,t-1} > 0$.
+
+\textbf{Required inputs:} \texttt{ib}, prior-year \texttt{at}.
+
+\textbf{Reference:} \cite{HouXueZhang2015,BalakrishnanBartovFaurel2010}.
+
+\textbf{Sign convention:} positive.
+
+\subsubsection{OP --- Operating Profitability}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{OP}_{i,t} = \frac{\mathrm{REVT}_{i,t} - \mathrm{COGS}_{i,t}
+                          - \mathrm{XSGA}_{i,t} - \mathrm{XINT}_{i,t}}
+                          {\mathrm{BE}_{i,t}},
+\label{eq:op}
+\end{equation}
+defined when $\mathrm{BE}_{i,t} > 0$. The numerator is
+operating profit: revenue minus cost of goods sold, minus selling
+general and administrative expenses, minus interest expense. Missing
+values for COGS, XSGA, or XINT are treated as zero (the standard
+Fama-French convention).
+
+\textbf{Required inputs:} \texttt{revt} (or \texttt{sale} as fallback),
+\texttt{cogs}, \texttt{xsga}, \texttt{xint}, BE inputs.
+
+\textbf{Reference:} \cite{FamaFrench2015}.
+
+\textbf{Sign convention:} positive. Operating profitability is one of
+the five factors in FF5 and a robust positive return predictor.
+
+\subsubsection{PM --- Profit Margin}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{PM}_{i,t} = \frac{\mathrm{IB}_{i,t}}{\mathrm{SALE}_{i,t}},
+\label{eq:pm}
+\end{equation}
+defined when $|\mathrm{SALE}_{i,t}| > 0.01$ (a small threshold to avoid
+division by near-zero).
+
+\textbf{Required inputs:} \texttt{ib}, \texttt{sale}.
+
+\textbf{Reference:} \cite{SoliFridson1995}.
+
+\textbf{Sign convention:} positive.
+
+\subsubsection{PCM --- Price-Cost Margin}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{PCM}_{i,t} = \frac{\mathrm{SALE}_{i,t} - \mathrm{COGS}_{i,t}}
+                          {\mathrm{SALE}_{i,t}},
+\label{eq:pcm}
+\end{equation}
+defined when $|\mathrm{SALE}_{i,t}| > 0.01$. PCM is gross margin: gross
+profit divided by sales.
+
+\textbf{Required inputs:} \texttt{sale}, \texttt{cogs}.
+
+\textbf{Reference:} \cite{Gorodnichenko2010}.
+
+\textbf{Sign convention:} positive (mild).
+
+\subsubsection{RNA --- Return on Net Assets}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{RNA}_{i,t} = \frac{\mathrm{IB}_{i,t}}{\mathrm{AT}_{i,t} - \mathrm{CHE}_{i,t}},
+\label{eq:rna}
+\end{equation}
+defined when $|\mathrm{AT}_{i,t} - \mathrm{CHE}_{i,t}| > 0.01$. The
+denominator is "operating assets" --- total assets minus cash and short-term
+investments. Missing CHE is treated as zero.
+
+\textbf{Required inputs:} \texttt{ib}, \texttt{at}, \texttt{che}.
+
+\textbf{Reference:} \cite{SoliFridson1995}.
+
+\textbf{Sign convention:} positive. RNA strips out cash holdings to
+focus on the productive asset base; high RNA indicates efficient
+operations.
+
+\subsection{Investment Family (6)}
+\label{subsec:stage0-investment}
+
+The investment family contains characteristics measuring the rate of
+firm-level capital investment (real, intangible, and accounting). The
+core economic finding (\citealp{CooperGulenSchill2008}, formalized in
+\citealp{HouXueZhang2015,FamaFrench2015}) is that high-investment firms
+underperform low-investment firms after controlling for size and value.
+
+\subsubsection{Investment --- Annual Asset Growth}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{Investment}_{i,t} = \frac{\mathrm{AT}_{i,t}}{\mathrm{AT}_{i,t-1}} - 1,
+\label{eq:investment}
+\end{equation}
+defined when $\mathrm{AT}_{i,t-1} > 0$. The simplest investment
+characteristic: the annual percentage change in total assets.
+
+\textbf{Required inputs:} \texttt{at}, prior-year \texttt{at}.
+
+\textbf{Reference:} \cite{CooperGulenSchill2008}.
+
+\textbf{Sign convention:} negative. The "asset-growth anomaly" is one
+of the most robustly documented effects in factor research.
+
+\subsubsection{NOA --- Net Operating Assets}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{NOA}_{i,t} = \frac{\mathrm{OP}^{\text{assets}}_{i,t}
+                            - \mathrm{OP}^{\text{liab}}_{i,t}}
+                          {\mathrm{AT}_{i,t-1}},
+\label{eq:noa-ratio}
+\end{equation}
+where the operating-assets and operating-liabilities terms are
+\begin{align}
+\mathrm{OP}^{\text{assets}}_{i,t} &= \mathrm{AT}_{i,t} - \mathrm{CHE}_{i,t}
+                                    - \mathrm{INTAN}_{i,t}, \label{eq:noa-assets}\\
+\mathrm{OP}^{\text{liab}}_{i,t} &= \mathrm{AT}_{i,t} - \mathrm{DLTT}_{i,t}
+                                  - \mathrm{DLC}_{i,t} - \mathrm{PSTK}_{i,t}
+                                  - \mathrm{SE}_{i,t}. \label{eq:noa-liab}
+\end{align}
+
+The intuition is to compute net operating assets (productive assets net
+of operating liabilities) and scale by lagged total assets. Missing
+values for CHE, INTAN, DLTT, DLC, PSTK, and the various BE-related
+items are treated as zero.
+
+\textbf{Required inputs:} \texttt{at}, \texttt{che}, \texttt{intan},
+\texttt{dltt}, \texttt{dlc}, \texttt{pstk}, BE inputs, prior-year
+\texttt{at}.
+
+\textbf{Reference:} \cite{HirshleiferHouTeoh2004}.
+
+\textbf{Sign convention:} negative. High NOA indicates aggressive
+investment in operating assets, which on average underperforms.
+
+\subsubsection{DPI2A --- Change in PPE and Inventory}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{DPI2A}_{i,t} = \frac{\Delta \mathrm{PPENT}_{i,t}
+                              + \Delta \mathrm{INVT}_{i,t}}
+                            {\mathrm{AT}_{i,t-1}},
+\label{eq:dpi2a}
+\end{equation}
+where $\Delta X_{i,t} = X_{i,t} - X_{i,t-1}$ and the PPE+Inventory
+sum is set to zero where individual components are missing.
+
+\textbf{Required inputs:} \texttt{ppent}, \texttt{invt}, prior-year
+versions, \texttt{at}.
+
+\textbf{Reference:} \cite{LyandresSunZhang2008}.
+
+\textbf{Sign convention:} negative. A more direct measure of physical
+investment than total asset growth.
+
+\subsubsection{NI --- Net Share Issuance}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{NI}_{i,t} = \log\left(
+   \frac{\mathrm{shrout}^{\mathrm{adj}}_{i,t}}
+        {\mathrm{shrout}^{\mathrm{adj}}_{i,t-12}}
+\right),
+\label{eq:ni}
+\end{equation}
+where $\mathrm{shrout}^{\mathrm{adj}}_{i,t} = \mathrm{shrout}_{i,t}
+\cdot \mathrm{cfacshr}_{i,t}$ is the split-adjusted share count. NI is
+the 12-month log change in adjusted shares outstanding.
+
+\textbf{Required inputs:} \texttt{shrout}, \texttt{cfacshr}.
+
+\textbf{Reference:} \cite{PontiffWoodgate2008,DanielTitman2006}.
+
+\textbf{Sign convention:} negative. Firms that issue shares
+(positive NI) tend to underperform; firms that buy back shares
+(negative NI) tend to outperform.
+
+\textbf{Known issues:} NI is monthly (computed from monthly CRSP),
+not annual like the other Investment-family members. We classify it
+under Investment because it is an issuance/repurchase activity
+indicator, not a market signal.
+
+\subsubsection{OA --- Operating Accruals}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{OA}_{i,t} = \frac{(\Delta\mathrm{ACT}_{i,t} - \Delta\mathrm{CHE}_{i,t})
+                          - (\Delta\mathrm{LCT}_{i,t} - \Delta\mathrm{DLC}_{i,t})
+                          - \mathrm{DP}_{i,t}}
+                          {\mathrm{AT}_{i,t-1}},
+\label{eq:oa}
+\end{equation}
+where again $\Delta X_{i,t} = X_{i,t} - X_{i,t-1}$ and missing
+components are treated as zero.
+
+The numerator decomposes the change in non-cash working capital:
+\begin{itemize}
+\item $\Delta \mathrm{ACT} - \Delta \mathrm{CHE}$: change in non-cash
+      current assets;
+\item $\Delta \mathrm{LCT} - \Delta \mathrm{DLC}$: change in
+      non-debt current liabilities;
+\item $\mathrm{DP}$: depreciation expense.
+\end{itemize}
+
+\textbf{Required inputs:} \texttt{act}, \texttt{lct}, \texttt{che},
+\texttt{dlc}, \texttt{dp}, prior-year versions, \texttt{at}.
+
+\textbf{Reference:} \cite{Sloan1996}.
+
+\textbf{Sign convention:} negative. Sloan's original finding: high
+accruals predict negative future returns because they reflect earnings
+that are not yet realized in cash and tend to reverse.
+
+\subsubsection{AC --- Total Accruals}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{AC}_{i,t} = \frac{\mathrm{NOA}_{i,t} \cdot \mathrm{AT}_{i,t-1}
+                          - \mathrm{NOA}_{i,t-1} \cdot \mathrm{AT}_{i,t-2}}
+                          {\mathrm{AT}_{i,t-1}},
+\label{eq:ac}
+\end{equation}
+defined when both prior-period NOA and $\mathrm{AT}_{i,t-2}$ are
+non-missing (audit fix 2 from Document 1, \S\ref{subsec:stage0-audit-fixes}).
+
+The numerator is the dollar change in NOA from year $t-1$ to year $t$;
+the denominator scales by lagged total assets to make the figure
+comparable across firms.
+
+\textbf{Required inputs:} NOA inputs (current and prior year),
+prior-year and lag-2 \texttt{at}.
+
+\textbf{Reference:} \cite{RichardsonSloanSoliman2005}.
+
+\textbf{Sign convention:} negative. AC generalizes the operating
+accruals concept to total firm-level accruals.
+
+\textbf{Known issues:} Per audit fix 2, we do NOT impute zero for
+missing NOA${}_{i,t-1}$. First-observation firms and firms with missing
+\texttt{at\_lag2} have NA AC and are dropped by the completeness filter.
+
+\subsection{Momentum Family (8)}
+\label{subsec:stage0-momentum}
+
+Momentum characteristics measure recent return patterns at various
+horizons: short-term reversal (1 month), intermediate momentum (months
+2--12 and 7--12), long-term reversal (months 13--36 and 13--60), price
+position (52-week high), and volume anomalies (SUV). All are computed
+from the CRSP monthly file and use \emph{raw} returns rather than
+excess returns, following the academic convention of
+\cite{JegadeeshTitman1993} and the FNW Appendix.
+
+\subsubsection{r12\_2 --- Standard Momentum}
+
+\textbf{Definition:}
+\begin{equation}
+r_{12,2}^{\text{(i,t)}} = \prod_{s=t-12}^{t-2} (1 + r_{i,s}) - 1,
+\label{eq:r12-2}
+\end{equation}
+the compound raw return from $t-12$ to $t-2$ inclusive (skipping the
+most recent month $t-1$ to avoid contamination from short-term
+reversal). 11-month formation window.
+
+\textbf{Required inputs:} \texttt{ret\_adj} (split-adjusted raw returns).
+
+\textbf{Reference:} \cite{JegadeeshTitman1993,FamaFrench1996}.
+
+\textbf{Sign convention:} positive. The canonical momentum signal:
+recent winners continue winning at horizons of 6--12 months.
+
+\textbf{Known issues:} Computation requires at least 8 of the 11 months
+to be observed (\texttt{min\_periods=8} in the rolling window) to
+ensure adequate data; firms with insufficient history have NA r12\_2.
+
+\subsubsection{r2\_1 --- Short-Term Reversal Signal}
+
+\textbf{Definition:}
+\begin{equation}
+r_{2,1}^{\text{(i,t)}} = r_{i,t-1},
+\label{eq:r2-1}
+\end{equation}
+the prior-month raw return.
+
+\textbf{Required inputs:} \texttt{ret\_adj}.
+
+\textbf{Reference:} \cite{Lehmann1990,JegadeeshTitman1993}.
+
+\textbf{Sign convention:} negative. High prior-month returns
+predict low next-month returns (the short-term reversal effect).
+
+\subsubsection{ST\_REV --- Short-Term Reversal Factor}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{ST\_REV}_{i,t} = -r_{2,1}^{\text{(i,t)}} = -r_{i,t-1}.
+\label{eq:st-rev}
+\end{equation}
+
+ST\_REV is just the negative of r2\_1, recoded so the sign convention
+matches the long-side direction.
+
+\textbf{Sign convention:} positive (by construction).
+
+\textbf{Note:} ST\_REV and r2\_1 are perfectly rank-correlated (Spearman
+$=$ 1.0 with sign flip). They are kept as separate columns in the
+panel as a CPZ convention. Stage 4 will see them as duplicates and
+either method will handle the redundancy via its own mechanism (PCA
+collapses; Ridge shrinks; etc.).
+
+\subsubsection{r12\_7 --- Intermediate Momentum}
+
+\textbf{Definition:}
+\begin{equation}
+r_{12,7}^{\text{(i,t)}} = \prod_{s=t-12}^{t-7} (1 + r_{i,s}) - 1,
+\label{eq:r12-7}
+\end{equation}
+the compound raw return from $t-12$ to $t-7$ inclusive. 6-month
+formation window covering the older half of standard momentum.
+
+\textbf{Required inputs:} \texttt{ret\_adj}.
+
+\textbf{Reference:} \cite{NovyMarx2012}.
+
+\textbf{Sign convention:} positive. Novy-Marx (2012) shows that
+intermediate momentum (months 7--12) carries the bulk of the standard
+momentum signal, while months 2--6 carry weaker signal. r12\_7
+isolates this effect.
+
+\subsubsection{r36\_13 --- Long-Term Reversal}
+
+\textbf{Definition:}
+\begin{equation}
+r_{36,13}^{\text{(i,t)}} = \prod_{s=t-36}^{t-13} (1 + r_{i,s}) - 1,
+\label{eq:r36-13}
+\end{equation}
+24-month formation window covering months 13--36 prior to formation.
+
+\textbf{Required inputs:} \texttt{ret\_adj}.
+
+\textbf{Reference:} \cite{DeBondtThaler1985}.
+
+\textbf{Sign convention:} negative. The long-term reversal effect:
+firms with strong returns 1--3 years ago tend to underperform going
+forward.
+
+\subsubsection{LT\_Rev --- Very Long-Term Reversal}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{LT\_Rev}_{i,t} = \prod_{s=t-60}^{t-13} (1 + r_{i,s}) - 1,
+\label{eq:lt-rev}
+\end{equation}
+48-month formation window covering months 13--60.
+
+\textbf{Required inputs:} \texttt{ret\_adj}.
+
+\textbf{Reference:} \cite{DeBondtThaler1985}.
+
+\textbf{Sign convention:} negative. Even longer-horizon reversal,
+following the original DeBondt-Thaler 5-year horizon.
+
+\subsubsection{Rel2High --- Price-to-52-Week-High}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{Rel2High}_{i,t} = \frac{\mathrm{prc}^{\mathrm{adj}}_{i,t}}
+                                {\max_{s \in [t-12,\, t-1]}
+                                 \mathrm{prc}^{\mathrm{adj}}_{i,s}},
+\label{eq:rel2high}
+\end{equation}
+where $\mathrm{prc}^{\mathrm{adj}}_{i,t} = |\mathrm{prc}_{i,t}|
+/ \mathrm{cfacpr}_{i,t}$ is the split-adjusted price (audit fix 3 from
+Document 1, \S\ref{subsec:stage0-audit-fixes}).
+
+\textbf{Required inputs:} \texttt{prc}, \texttt{cfacpr}.
+
+\textbf{Reference:} \cite{GeorgeHwang2004}.
+
+\textbf{Sign convention:} positive. George and Hwang document that
+prices near their 52-week highs predict positive future returns ---
+a momentum-related signal that is somewhat orthogonal to standard
+return-momentum.
+
+\textbf{Known issues:} Per audit fix 3, raw prices are converted to
+split-adjusted before the rolling maximum.
+
+\subsubsection{SUV --- Standardized Unexplained Volume}
+
+\textbf{Definition:} For each firm-month, fit an AR(3) regression of
+log volume on its three lags using the past 36 months of data:
+\begin{equation}
+\log V_{i,s} = \alpha_i + \beta_1 \log V_{i,s-1} + \beta_2 \log V_{i,s-2}
+              + \beta_3 \log V_{i,s-3} + \epsilon_{i,s},
+\label{eq:suv-fit}
+\end{equation}
+estimated over $s \in [t - 36, t - 1]$. Then SUV is the standardized
+residual at month $t$:
+\begin{equation}
+\mathrm{SUV}_{i,t} = \frac{\log V_{i,t} - \widehat{\log V}_{i,t}}
+                          {\widehat{\sigma}_{\epsilon, i}},
+\label{eq:suv}
+\end{equation}
+where $\widehat{\log V}_{i,t}$ is the AR(3) prediction at $t$ and
+$\widehat{\sigma}_{\epsilon, i}$ is the regression standard error.
+
+\textbf{Required inputs:} \texttt{vol}.
+
+\textbf{Reference:} \cite{Garfinkel2009}, building on the
+Lo-Wang volume literature.
+
+\textbf{Sign convention:} positive (mild). SUV captures abnormal
+trading volume; firms with high SUV (recent volume above their
+typical level) tend to outperform in the short run.
+
+\textbf{Known issues:} The minimum window is 12 months
+(\texttt{min\_len = 12}). Computationally expensive: each firm-month
+fits an OLS, and the per-firm Python loop is the runtime bottleneck of
+Stage 0 (\(\sim\)20 minutes for the full panel).
+
+\subsection{Risk Family (5)}
+\label{subsec:stage0-risk}
+
+The risk family contains five characteristics computed from CRSP daily
+data over a 252-trading-day rolling window: market beta, market beta
+(duplicate naming), idiosyncratic volatility, residual variance, and
+total variance. All five involve a daily-frequency OLS regression of
+excess returns on market excess returns:
+\begin{equation}
+r^{ex}_{i,d} = \alpha_{i,t} + \beta_{i,t} \cdot \mathrm{MKT}^{ex}_d + \epsilon_{i,d},
+\quad d \in \mathcal{W}_{i,t},
+\label{eq:risk-regression}
+\end{equation}
+where $\mathcal{W}_{i,t}$ is the set of valid daily observations for
+firm $i$ over the 252 trading days ending at month-end $t$. We require
+at least 60 valid daily observations to compute the regression.
+
+\subsubsection{Beta --- Market Beta (CAPM)}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{Beta}_{i,t} = \widehat{\beta}_{i,t}
+\quad \text{from regression~\eqref{eq:risk-regression}}.
+\label{eq:beta}
+\end{equation}
+
+\textbf{Required inputs:} CRSP daily \texttt{ret}, FF daily
+\texttt{mktrf} and \texttt{rf}.
+
+\textbf{Reference:} \cite{Sharpe1964,FrazziniPedersen2014}.
+
+\textbf{Sign convention:} negative. The "betting against beta" anomaly
+(Frazzini-Pedersen): low-beta stocks earn higher risk-adjusted returns
+than high-beta stocks, the reverse of CAPM's prediction.
+
+\subsubsection{MktBeta --- Market Beta (Duplicate)}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{MktBeta}_{i,t} = \widehat{\beta}_{i,t}.
+\label{eq:mktbeta}
+\end{equation}
+
+\textbf{Note:} MktBeta and Beta are identical by construction. Per
+the v2 decision (DECISION\_LOG entry 014), we keep both columns. They
+will be perfect rank-duplicates in Stage 4 and Stage 4 methods will
+handle the redundancy.
+
+\subsubsection{IdioVol --- Idiosyncratic Volatility}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{IdioVol}_{i,t} = \sqrt{252} \cdot
+\mathrm{std}\bigl(\widehat{\epsilon}_{i,d}\bigr),
+\quad d \in \mathcal{W}_{i,t},
+\label{eq:idiovol}
+\end{equation}
+where $\widehat{\epsilon}_{i,d}$ are the residuals from
+regression~\eqref{eq:risk-regression}.
+
+\textbf{Required inputs:} CRSP daily \texttt{ret}, FF daily
+\texttt{mktrf}.
+
+\textbf{Reference:} \cite{AngHodrickXing2006}.
+
+\textbf{Sign convention:} negative. The "idiosyncratic volatility
+puzzle" (Ang et al. 2006): high-IdioVol stocks have lower returns,
+contradicting standard portfolio theory.
+
+\subsubsection{Resid\_Var --- Residual Variance}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{Resid\_Var}_{i,t} = 252 \cdot \mathrm{var}\bigl(\widehat{\epsilon}_{i,d}\bigr).
+\label{eq:resid-var}
+\end{equation}
+
+\textbf{Note:} $\mathrm{Resid\_Var}_{i,t} = (\mathrm{IdioVol}_{i,t})^2$,
+so this is a deterministic function of IdioVol; perfectly rank-correlated
+with IdioVol after the squaring (which preserves rank since IdioVol is
+non-negative).
+
+\textbf{Reference:} Same as IdioVol.
+
+\textbf{Sign convention:} negative.
+
+\textbf{Note on duplicates:} As with MktBeta, Resid\_Var is a perfect
+rank-duplicate of IdioVol. Per v2 decision (DECISION\_LOG entry 014),
+we keep both.
+
+\subsubsection{Variance --- Total Variance}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{Variance}_{i,t} = 252 \cdot \mathrm{var}\bigl(r_{i,d}\bigr),
+\quad d \in \mathcal{W}_{i,t}.
+\label{eq:variance}
+\end{equation}
+
+The total annualized return variance, ignoring the market regression.
+
+\textbf{Required inputs:} CRSP daily \texttt{ret}.
+
+\textbf{Reference:} \cite{Goyal2003}.
+
+\textbf{Sign convention:} negative.
+
+\subsection{Liquidity Family (3)}
+\label{subsec:stage0-liquidity}
+
+The liquidity family contains three characteristics measuring trading
+ease or its inverse (cost): the Roll-implied bid-ask spread (described
+in Document 1), log turnover (volume scaled by shares outstanding),
+and log market equity (a proxy for both size and liquidity).
+
+\subsubsection{Spread --- Roll (1984) Implied Spread}
+
+\textbf{Definition:} See Document 1, \S\ref{subsec:stage0-roll},
+eq.~\eqref{eq:roll-impl}.
+
+\textbf{Required inputs:} CRSP daily \texttt{ret}.
+
+\textbf{Reference:} \cite{Roll1984}.
+
+\textbf{Sign convention:} positive. Higher-spread (illiquid) stocks
+earn higher returns to compensate for trading costs (Amihud-Mendelson
+1986).
+
+\subsubsection{LTurnover --- Log Turnover}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{LTurnover}_{i,t} = \log\left(
+   \frac{\mathrm{vol}_{i,t}}{\mathrm{shrout}_{i,t} \cdot 1000}
+\right),
+\label{eq:lturnover}
+\end{equation}
+where the $1000$ factor converts \texttt{shrout} from thousands to raw
+share counts. The argument is monthly volume divided by shares
+outstanding: turnover.
+
+\textbf{Required inputs:} \texttt{vol}, \texttt{shrout}.
+
+\textbf{Reference:} \cite{LeeSwaminathan2000,Datar1998}.
+
+\textbf{Sign convention:} negative (mild). High-turnover stocks tend
+to underperform; this is sometimes interpreted as a proxy for
+disagreement or speculative interest.
+
+\subsubsection{LME --- Log Market Equity}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{LME}_{i,t} = \log(\mathrm{ME}_{i,t-1}),
+\label{eq:lme}
+\end{equation}
+the log of the previous month-end market equity. The lag ensures the
+characteristic is observable as of the formation date $t$.
+
+\textbf{Required inputs:} \texttt{prc}, \texttt{shrout} (for ME).
+
+\textbf{Reference:} \cite{Banz1981,FamaFrench1992}.
+
+\textbf{Sign convention:} negative. The size effect: smaller firms
+earn higher returns. Substantially weaker post-1980 in the empirical
+record.
+
+\subsection{Other Family (11)}
+\label{subsec:stage0-other}
+
+The "Other" family is a heterogeneous group of accounting
+characteristics that do not fit cleanly into the value, profitability,
+or investment families.
+
+\subsubsection{Q --- Tobin's Q}
+
+\textbf{Definition:}
+\begin{equation}
+Q_{i,t} = \frac{\mathrm{AT}_{i,t} + \mathrm{ME}_{i,t} - \mathrm{BE}_{i,t}}
+                {\mathrm{AT}_{i,t}},
+\label{eq:tobins-q}
+\end{equation}
+defined when $\mathrm{AT}_{i,t} > 0$ and $\mathrm{ME}_{i,t} > 0$. The
+classic Tobin's Q approximation: total enterprise value divided by
+replacement cost. Missing BE is treated as zero.
+
+\textbf{Required inputs:} \texttt{at}, ME, BE.
+
+\textbf{Reference:} \cite{Tobin1969,LangStulz1994}.
+
+\textbf{Sign convention:} negative. High-Q (growth) firms tend to
+underperform low-Q (value) firms; a value-related effect.
+
+\subsubsection{C --- Cash-to-Assets}
+
+\textbf{Definition:}
+\begin{equation}
+C_{i,t} = \frac{\mathrm{CHE}_{i,t}}{\mathrm{AT}_{i,t}},
+\label{eq:c}
+\end{equation}
+defined when $\mathrm{AT}_{i,t} > 0$. Missing CHE is treated as zero.
+
+\textbf{Required inputs:} \texttt{che}, \texttt{at}.
+
+\textbf{Reference:} \cite{Palazzo2012}.
+
+\textbf{Sign convention:} positive (mild). High cash holdings can
+indicate financial flexibility or, alternatively, agency costs from
+inefficient capital allocation; the sign is empirically debated.
+
+\subsubsection{CF --- Cash Flow Yield}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{CF}_{i,t} = \frac{\mathrm{IB}_{i,t} + \mathrm{DP}_{i,t}}
+                          {\mathrm{ME}_{i,t}}.
+\label{eq:cf}
+\end{equation}
+
+\textbf{Note:} CF and CF2P are identical by construction. They are kept
+as separate columns per CPZ convention; both will appear in Stage 4
+inputs and downstream methods will handle the duplicate.
+
+\textbf{Required inputs:} \texttt{ib}, \texttt{dp}, ME.
+
+\textbf{Reference:} Same as CF2P (\cite{Lakonishok1994}).
+
+\textbf{Sign convention:} positive.
+
+\subsubsection{AT --- Log Total Assets}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{AT}_{i,t} = \log(\mathrm{at}_{i,t}),
+\label{eq:log-at}
+\end{equation}
+defined when $\mathrm{at}_{i,t} > 0$. We clip $\mathrm{at}_{i,t}$ to
+$10^{-6}$ to handle rare zero or negative entries.
+
+\textbf{Required inputs:} \texttt{at}.
+
+\textbf{Reference:} \cite{FreybergerNeuhierlWeber2020}.
+
+\textbf{Sign convention:} negative. AT is a size proxy similar to LME
+but using book size rather than market size.
+
+\subsubsection{ATO --- Asset Turnover}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{ATO}_{i,t} = \frac{\mathrm{SALE}_{i,t}}{\mathrm{AT}_{i,t-1}},
+\label{eq:ato}
+\end{equation}
+defined when $\mathrm{AT}_{i,t-1} > 0$.
+
+\textbf{Required inputs:} \texttt{sale}, prior-year \texttt{at}.
+
+\textbf{Reference:} \cite{SoliFridson1995}.
+
+\textbf{Sign convention:} positive. ATO measures revenue-generating
+efficiency per dollar of assets.
+
+\subsubsection{CTO --- Capital Turnover}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{CTO}_{i,t} = \frac{\mathrm{SALE}_{i,t}}{\mathrm{PPENT}_{i,t}},
+\label{eq:cto}
+\end{equation}
+defined when $\mathrm{PPENT}_{i,t} > 0.01$. Capital turnover: sales
+per dollar of net property, plant, and equipment.
+
+\textbf{Required inputs:} \texttt{sale}, \texttt{ppent}.
+
+\textbf{Reference:} \cite{Haugen1996}.
+
+\textbf{Sign convention:} positive (mild).
+
+\subsubsection{D2A --- Debt-to-Assets}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{D2A}_{i,t} = \frac{\mathrm{DLTT}_{i,t} + \mathrm{DLC}_{i,t}}
+                          {\mathrm{AT}_{i,t}},
+\label{eq:d2a}
+\end{equation}
+defined when $\mathrm{AT}_{i,t} > 0$. Missing DLTT or DLC is treated as
+zero.
+
+\textbf{Required inputs:} \texttt{dltt}, \texttt{dlc}, \texttt{at}.
+
+\textbf{Reference:} \cite{Bhandari1988,FamaFrench1992}.
+
+\textbf{Sign convention:} positive (mild). Higher-leverage firms earn
+slightly higher returns to compensate for financial risk; the effect
+is small after controlling for other factors.
+
+\subsubsection{FC2Y --- Fixed Cost to Year-Total Assets (Operating Leverage Proxy)}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{FC2Y}_{i,t} = \frac{\mathrm{COGS}_{i,t} + \mathrm{XSGA}_{i,t}}
+                            {\mathrm{AT}_{i,t}},
+\label{eq:fc2y}
+\end{equation}
+defined when $\mathrm{AT}_{i,t} > 0$. Missing COGS or XSGA is treated
+as zero.
+
+\textbf{Required inputs:} \texttt{cogs}, \texttt{xsga}, \texttt{at}.
+
+\textbf{Reference:} \cite{NovyMarx2011}.
+
+\textbf{Sign convention:} positive. Higher operating leverage implies
+higher sensitivity to economic conditions and a corresponding return
+premium.
+
+\subsubsection{Lev --- Market Leverage}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{Lev}_{i,t} = \frac{\mathrm{DLTT}_{i,t} + \mathrm{DLC}_{i,t}}
+                          {\mathrm{DLTT}_{i,t} + \mathrm{DLC}_{i,t} + \mathrm{ME}_{i,t}},
+\label{eq:lev}
+\end{equation}
+defined when the denominator is positive. Market leverage: debt over
+debt plus market equity.
+
+\textbf{Required inputs:} \texttt{dltt}, \texttt{dlc}, ME.
+
+\textbf{Reference:} \cite{FamaFrench1992}.
+
+\textbf{Sign convention:} positive.
+
+\subsubsection{OL --- Operating Leverage (Same Formula as FC2Y)}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{OL}_{i,t} = \mathrm{FC2Y}_{i,t}.
+\label{eq:ol}
+\end{equation}
+
+\textbf{Note:} OL and FC2Y are identical by construction. Like the
+other duplicates (MktBeta/Beta, Resid\_Var/IdioVol, CF/CF2P, ST\_REV/r2\_1
+sign-flipped), both columns are retained per CPZ convention.
+
+\textbf{Sign convention:} positive (same as FC2Y).
+
+\subsubsection{SGA2S --- SG\&A to Sales}
+
+\textbf{Definition:}
+\begin{equation}
+\mathrm{SGA2S}_{i,t} = \frac{\mathrm{XSGA}_{i,t}}{\mathrm{SALE}_{i,t}},
+\label{eq:sga2s}
+\end{equation}
+defined when $|\mathrm{SALE}_{i,t}| > 0.01$. Missing XSGA is treated
+as zero.
+
+\textbf{Required inputs:} \texttt{xsga}, \texttt{sale}.
+
+\textbf{Reference:} \cite{ChenZhang2010}.
+
+\textbf{Sign convention:} negative. High SG\&A intensity may indicate
+operational inefficiency.
+
+\subsection{Summary Table}
+\label{subsec:stage0-chars-summary}
+
+Table~\ref{tab:char-summary} consolidates all 46 characteristics with
+their family, formula reference (equation in this document), academic
+source, and predicted sign.
+
+\begin{table}[!ht]
+\centering
+\footnotesize
+\begin{tabular}{lllrl}
+\toprule
+\textbf{Characteristic} & \textbf{Family} & \textbf{Reference} & \textbf{Eq.} & \textbf{Sign} \\
+\midrule
+BEME & Value & FamaFrench1992 & \ref{eq:beme} & + \\
+E2P & Value & Basu1977 & \ref{eq:e2p} & + \\
+CF2P & Value & Lakonishok1994 & \ref{eq:cf2p} & + \\
+D2P & Value & LitzenbergerRamaswamy1979 & \ref{eq:d2p} & + \\
+S2P & Value & Barbee1996 & \ref{eq:s2p} & + \\
+A2ME & Value & BharyMcLean2014 & \ref{eq:a2me} & + \\
+\midrule
+PROF & Profitability & NovyMarx2013 & \ref{eq:prof} & + \\
+ROE & Profitability & HouXueZhang2015 & \ref{eq:roe} & + \\
+ROA & Profitability & BalakrishnanBartovFaurel2010 & \ref{eq:roa} & + \\
+OP & Profitability & FamaFrench2015 & \ref{eq:op} & + \\
+PM & Profitability & SoliFridson1995 & \ref{eq:pm} & + \\
+PCM & Profitability & Gorodnichenko2010 & \ref{eq:pcm} & + \\
+RNA & Profitability & SoliFridson1995 & \ref{eq:rna} & + \\
+\midrule
+Investment & Investment & CooperGulenSchill2008 & \ref{eq:investment} & --- \\
+NOA & Investment & HirshleiferHouTeoh2004 & \ref{eq:noa-ratio} & --- \\
+DPI2A & Investment & LyandresSunZhang2008 & \ref{eq:dpi2a} & --- \\
+NI & Investment & PontiffWoodgate2008 & \ref{eq:ni} & --- \\
+OA & Investment & Sloan1996 & \ref{eq:oa} & --- \\
+AC & Investment & RichardsonSloanSoliman2005 & \ref{eq:ac} & --- \\
+\midrule
+r12\_2 & Momentum & JegadeeshTitman1993 & \ref{eq:r12-2} & + \\
+r2\_1 & Momentum & Lehmann1990 & \ref{eq:r2-1} & --- \\
+ST\_REV & Momentum & Lehmann1990 & \ref{eq:st-rev} & + \\
+r12\_7 & Momentum & NovyMarx2012 & \ref{eq:r12-7} & + \\
+r36\_13 & Momentum & DeBondtThaler1985 & \ref{eq:r36-13} & --- \\
+LT\_Rev & Momentum & DeBondtThaler1985 & \ref{eq:lt-rev} & --- \\
+Rel2High & Momentum & GeorgeHwang2004 & \ref{eq:rel2high} & + \\
+SUV & Momentum & Garfinkel2009 & \ref{eq:suv} & + \\
+\midrule
+Beta & Risk & FrazziniPedersen2014 & \ref{eq:beta} & --- \\
+MktBeta & Risk & FrazziniPedersen2014 & \ref{eq:mktbeta} & --- \\
+IdioVol & Risk & AngHodrickXing2006 & \ref{eq:idiovol} & --- \\
+Resid\_Var & Risk & AngHodrickXing2006 & \ref{eq:resid-var} & --- \\
+Variance & Risk & Goyal2003 & \ref{eq:variance} & --- \\
+\midrule
+Spread & Liquidity & Roll1984 & \ref{eq:roll-impl} & + \\
+LTurnover & Liquidity & LeeSwaminathan2000 & \ref{eq:lturnover} & --- \\
+LME & Liquidity & Banz1981 & \ref{eq:lme} & --- \\
+\midrule
+Q & Other & Tobin1969 & \ref{eq:tobins-q} & --- \\
+C & Other & Palazzo2012 & \ref{eq:c} & + \\
+CF & Other & Lakonishok1994 & \ref{eq:cf} & + \\
+AT & Other & FreybergerNeuhierlWeber2020 & \ref{eq:log-at} & --- \\
+ATO & Other & SoliFridson1995 & \ref{eq:ato} & + \\
+CTO & Other & Haugen1996 & \ref{eq:cto} & + \\
+D2A & Other & FamaFrench1992 & \ref{eq:d2a} & + \\
+FC2Y & Other & NovyMarx2011 & \ref{eq:fc2y} & + \\
+Lev & Other & FamaFrench1992 & \ref{eq:lev} & + \\
+OL & Other & NovyMarx2011 & \ref{eq:ol} & + \\
+SGA2S & Other & ChenZhang2010 & \ref{eq:sga2s} & --- \\
+\bottomrule
+\end{tabular}
+\caption{All 46 characteristics with family, primary academic source,
+equation number in this document, and predicted sign of forward-return
+correlation. Sign of "+" means high values predict positive returns;
+"---" means high values predict negative returns.}
+\label{tab:char-summary}
+\end{table}
+
+\subsection{Known Rank-Duplicate Pairs}
+\label{subsec:stage0-duplicates}
+
+Five pairs of characteristics in the panel are perfectly rank-correlated
+by construction. Per the v2 design (DECISION\_LOG entry 014), all 46
+columns are retained; Stage 4 methods handle the duplication.
+
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Pair} & \textbf{Relationship} & \textbf{Notes} \\
+\midrule
+MktBeta, Beta & Identical & Same regression slope, named both ways \\
+Resid\_Var, IdioVol & $\mathrm{Resid\_Var} = \mathrm{IdioVol}^2$ &
+   Square preserves rank since IdioVol $\ge 0$ \\
+CF, CF2P & Identical & Same numerator and denominator \\
+OL, FC2Y & Identical & Same formula, two names per CPZ \\
+ST\_REV, r2\_1 & Sign-flipped & ST\_REV $= -\mathrm{r2\_1}$;
+   Spearman $=-1$ \\
+\bottomrule
+\end{tabular}
+\caption{Five rank-duplicate pairs in the 46-characteristic panel.
+All retained per v2 decision; Stage 4 methods handle duplication.}
+\label{tab:duplicates}
+\end{table}
+
+\subsection{Document 2 Conclusion}
+
+Document 2 has specified the construction formulas for all 46 firm
+characteristics in the panel, organized by family with academic
+references and predicted signs. Equations are numbered for cross-reference
+from Stage 0's implementation code (each formula corresponds to a
+function in \texttt{src/data\_reconstruction/characteristics/}).
+
+The characteristics divide into five rank-duplicate pairs by
+construction (Table~\ref{tab:duplicates}), reflecting CPZ's convention
+of carrying multiple names for related quantities. We retain all
+duplicates per the v2 design decision (DECISION\_LOG entry 014).
+
+Document 3 (forthcoming) details the validation methodology that will
+verify our reconstruction matches CPZ on the 1967--2016 overlap and
+matches Fama-French published factors on 2017--2024.

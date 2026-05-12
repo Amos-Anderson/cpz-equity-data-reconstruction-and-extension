@@ -1,0 +1,75 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Environments
+.env
+.venv
+env/
+venv/
+.conda/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+# Clear notebook outputs before commit, but keep notebooks
+# (uncomment next line if you want to ignore outputs entirely)
+# *.ipynb
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Factors
+data/factors/*.parquet
+
+# Data — NEVER commit
+data/
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.csv
+*.xlsx
+!tests/fixtures/*.parquet
+!tests/fixtures/*.csv
+
+# Reports — compiled outputs
+reports/*.pdf
+reports/*.aux
+reports/*.log
+reports/*.out
+reports/*.toc
+reports/*.bbl
+reports/*.blg
+reports/*.fls
+reports/*.fdb_latexmk
+reports/*.synctex.gz
+reports/figures/*.png
+!reports/figures/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets
+*.pem
+*.key
+secrets/

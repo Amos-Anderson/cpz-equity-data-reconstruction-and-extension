@@ -1,0 +1,12 @@
+# Top-level ruff config mirrors pyproject.toml [tool.ruff]
+# Provided separately so editors that don't parse pyproject.toml still pick it up.
+
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "I", "N", "D", "UP", "B", "C4", "SIM"]
+ignore = ["D100", "D104", "D203", "D212", "E501"]
+
+[lint.pydocstyle]
+convention = "numpy"

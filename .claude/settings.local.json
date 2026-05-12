@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm \"src/data_reconstruction/validation.py\")",
+      "Bash(mkdir \"src/data_reconstruction/validation\")",
+      "Bash(conda run *)",
+      "Bash(cat > *)",
+      "Bash(ls \"C:/Users/amosa/ml4t_data/academic/\" 2>&1)",
+      "Read(//c/Users/amosa/ml4t_data/academic/**)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}

@@ -1,0 +1,1237 @@
+================================================================================
+  FUNDAMENTAL FACTOR INVESTING PIPELINE — PROJECT ROADMAP 
+================================================================================
+
+  Author:          Amos Anderson
+  Document:        ROADMAP_NEW_FFI.txt 
+  Last updated:    2026-05-07
+  Status:          Active 
+
+--------------------------------------------------------------------------------
+  TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+  1.  Project identity
+  2.  Locked-in design decisions
+  3.  Core philosophical principles 
+  4.  Data foundation (Stage 0) 
+  5.  The 11-stage pipeline 
+  6.  Architecture and tooling
+  7.  Development workflow 
+  8.  Academic references
+  9.  Risk register
+  10. Open questions
+
+
+================================================================================
+  1. PROJECT IDENTITY
+================================================================================
+
+  1.1  OBJECTIVE
+  --------------
+  Build an industry-grade long/short fundamental factor investing pipeline for
+  US equities, end-to-end, with mathematical rigor at every stage and full
+  academic documentation. The final strategy is paper-traded on Alpaca.
+
+  The pipeline must satisfy three simultaneous standards:
+    (a) Academic rigor — derivations, citations, statistical discipline
+    (b) Industry-grade engineering — modular, tested, reproducible
+    (c) Pedagogical clarity — usable as a teaching reference
+
+  1.2  STAKEHOLDER GOALS
+  ----------------------
+    - Personal investing capability (trade the strategy on own account)
+    - Resume / portfolio artifact for institutional quant roles
+    - Teaching material for future use
+
+  1.3  DELIVERABLES
+  -----------------
+    (a) Standalone Stage 0 data reconstruction package
+    (b) Python package `factor_pipeline/` with modular architecture
+    (c) Jupyter notebooks, one per stage, that import from the package
+    (d) LaTeX research report with full mathematical documentation
+    (e) Paper trading deployment on Alpaca
+    (f) Test suite covering core math operations
+    (g) Configuration artifacts (YAML) for each stage
+    (h) Stage 4 leaderboard comparing 4 signal-combination approaches
+
+  1.4  SUCCESS CRITERIA
+  ---------------------
+    Technical:
+      - All 11 stages implemented, tested, documented
+      - Reproducible: single command runs the full pipeline end-to-end
+      - PIT-correct: no look-ahead bias in any stage
+      - Stage 4 leaderboard cleanly identifies best combination method
+      - Backtest passes out-of-sample with positive Sharpe in test holdout
+      - Paper trading deployed and running on Alpaca
+
+    Academic:
+      - LaTeX report cites every method used
+      - Every non-trivial formula derived or derivation referenced
+      - Stage-by-stage math framework teachable end-to-end
+      - Stage 0 reconstruction validated against CPZ AND Ken French data
+      - Stage 4 four-method comparison rigorously executed
+
+    Practical:
+      - Strategy survives a pessimistic transaction cost assumption
+      - Capacity analysis shows meaningful tradable AUM
+      - Risk attribution is clean (factor exposures controlled, idio residual)
+
+
+================================================================================
+  2. LOCKED-IN DESIGN DECISIONS
+================================================================================
+
+  2.1  UNIVERSE
+  -------------
+    Data foundation: Restructured CPZ extended dataset (1967-2024)
+      - Built from raw CRSP + Compustat via WRDS
+      - 46 firm characteristics per Freyberger-Neuhierl-Weber (2020)
+      - Validated against CPZ paper data (1967-2016 overlap)
+      - Validated against Ken French research data (2017-2024 via FF5 portfolios)
+      - Modular package with submodules per characteristic family
+
+    Investable universe (Stage 1 output):
+      - Subset of CPZ-faithful panel with liquidity/size filters
+      - Multiple variants: academic_broad, liquid, NYSE-equivalent
+      - Filters are ex-ante and consistently applied
+
+  2.2  MANDATE AND HORIZON
+  ------------------------
+    Mandate:           Long/short equity
+    Rebalance:         Monthly (month-end snapshot, next-open execution)
+    Dollar-neutrality: Gross leverage 2.0 (1.0 long + 1.0 short)
+    Beta neutrality:   Target ex-ante beta zero to the market
+    Capital:           Assumed $10M for capacity analysis (scalable)
+
+  2.3  PAPER TRADING VENUE
+  ------------------------
+    Alpaca Paper Trading
+      - REST + WebSocket API
+      - Supports shorting (approximated; borrow modeled separately)
+      - Fractional shares available (rounded to whole shares)
+
+  2.4  RISK MODEL
+  ---------------
+    Primary:    Cross-sectional fundamental factor risk model
+                    (BARRA / Axioma style)
+                    Sigma_t = B_t F_t B_t' + D_t
+    Extension:  GARCH-NIG innovations on factor returns F_t and idiosyncratic
+                variances D_t
+
+  2.5  DOCUMENTATION FORMAT
+  -------------------------
+    Notebooks:   Jupyter (.ipynb), one per stage
+    Source:      Modular Python package in src/factor_pipeline/
+    Report:      LaTeX with BibTeX bibliography, compiled to PDF
+    Plots:       Plotly for interactive; matplotlib only for static LaTeX figs
+
+  2.6  PLATFORM
+  -------------
+    OS:          Windows (host)
+    Python:      3.11+
+    Envs:        Anaconda (factor-pipeline env in environment.yml)
+    IDE:         VS Code primary; Jupyter Lab for notebooks
+    Data store:  C:\Users\amosa\ml4t_data\
+    WRDS:        Available
+
+
+================================================================================
+  3. CORE PHILOSOPHICAL PRINCIPLES 
+================================================================================
+
+  3.1  MATHEMATICAL RIGOR FIRST
+  -----------------------------
+  At each stage, before writing any code, the full mathematical framework
+  must be built and explained:
+    - All relevant formulas with derivations
+    - All assumptions stated explicitly
+    - All references cited
+    - Alternatives considered and why we chose what we did
+    - Criticism of the chosen approach (where it might fail)
+
+  Code is a translation of math into runnable form. If the math is unclear
+  or incomplete, the code cannot be trusted regardless of test pass rate.
+
+  3.2  DEEPLY PEDAGOGICAL
+  -----------------------
+  Every stage walks through:
+    (a) Intuition: why we're doing this in plain language
+    (b) Mathematical formalization: the precise statement
+    (c) Derivation: where the formulas come from
+    (d) Alternatives: what other approaches exist
+    (e) Criticism: what could go wrong, what assumptions we're making
+    (f) Reference: where to read more (papers, textbooks)
+
+    3.3  EMPIRICAL COMPARISON OVER A PRIORI COMMITMENT
+  --------------------------------------------------
+  Where multiple defensible methods exist, we IMPLEMENT MULTIPLE METHODS
+  and compare them on consistent metrics. The most prominent application:
+  Stage 4's four-method comparison (statistical filtering, SVD/PCA,
+  regularized regression, Risk Premium PCA).
+
+  We do NOT a priori commit to a method based on aesthetic preference,
+  literature familiarity, or intuition. We EXECUTE the comparison and let
+  the data choose.
+
+  3.4  NO POST-HOC FILTERING
+  --------------------------
+  Decision rules (significance thresholds, robustness criteria, weighting
+  schemes) are LOCKED IN before computation. Whatever number of factors
+  pass our criterion is the number; we do not adjust thresholds to hit
+  a target count.
+
+  3.5  HONEST RESULTS REPORTING
+  -----------------------------
+  Whatever results emerge from the pipeline are reported as-is, with
+  explanations rather than apologies. Surprising findings are valuable
+  if methodologically sound.
+
+
+================================================================================
+  4. DATA FOUNDATION (STAGE 0) 
+================================================================================
+
+  4.1  WHAT CHANGES IN V2
+  -----------------------
+  v1 had a single Data_Pipeline.ipynb that performed the entire CPZ
+  reconstruction in one place. v2 splits this into a modular standalone
+  package, with mathematical documentation per characteristic family,
+  and adds rigorous validation against both CPZ (1967-2016) and
+  Fama-French (2017-2024) reference data.
+
+  4.2  STAGE 0 ARCHITECTURE
+  -------------------------
+  Standalone package: src/data_reconstruction/
+    +-- __init__.py
+    +-- raw_data/
+    |   +-- crsp_loader.py       Pulls monthly + daily from WRDS
+    |   +-- compustat_loader.py  Pulls fundamentals
+    |   +-- delisting.py         Shumway 1997 adjustment
+    +-- characteristics/
+    |   +-- value.py             BEME, E2P, CF2P, D2P, S2P, A2ME, etc.
+    |   +-- profitability.py     OP, GP, ROA, ROE, PROF, RNA, PM, PCM
+    |   +-- investment.py        Investment, NOA, DPI2A, NI, OA, AC
+    |   +-- momentum.py          r2_1, r12_2, r12_7, r36_13, ST_REV, etc.
+    |   +-- risk.py              Beta, IdioVol, Variance, Spread, etc.
+    |   +-- liquidity.py         LME, LTurnover, Turnover, etc.
+    |   +-- other.py             Q, AT, ATO, CTO, FC2Y, Lev, SGA2S, etc.
+    +-- pit/
+    |   +-- merge_asof.py        Point-in-time merge with tolerance
+    |   +-- audit.py             PIT correctness audits
+    +-- validation/
+    |   +-- cpz_comparison.py    Compare reconstructed factors to CPZ paper
+    |   +-- fama_french.py       Construct FF5 + UMD from our data
+    |   +-- ken_french_loader.py Pull KF reference series for comparison
+    |   +-- diagnostics.py       Per-factor cross-validation reports
+    +-- pipeline.py              Orchestrator: build full panel from raw data
+
+  4.3  STAGE 0 MATHEMATICAL CONTENT (DEEP)
+  ----------------------------------------
+  Per FNW (2020) and CPZ (2024), each of 46 characteristics has:
+    - Mathematical definition (numerator, denominator)
+    - Required input data items (CRSP variables, Compustat variables)
+    - Point-in-time lag specification (typically 6 months for fundamentals,
+      monthly for market data)
+    - Sign convention for return prediction (long-leg = positive sign)
+
+  Stage 0 writeup will include:
+    - Each of 46 characteristics derived in full with citation
+    - Davis-Fama-French (2000) book equity definition: derivation and rationale
+    - Shumway (1997) delisting adjustment: derivation and rationale
+    - Roll (1984) implied bid-ask spread: derivation, applicability bounds
+    - Merge_asof tolerance choice (380 days): rationale and sensitivity test
+    - All "audit fixes" applied: justification per fix, not just notation
+
+  4.4  VALIDATION SUITE 
+  ---------------------------
+  Two validation arms:
+
+  Arm 1: CPZ overlap (1967-2016)
+    Build factors from our raw data, compare to CPZ-published panel.
+    Metrics: per-factor correlation, mean-magnitude difference, year-by-year.
+    Acceptance: 49/50 years within 0.5% per-factor average; 44/46 chars
+    within 1e-4 absolute mean difference.
+
+  Arm 2: Fama-French (2017-2024)
+    Construct long-short FF5 portfolios from our data using FF protocol
+    (NYSE breakpoints, 2x3 sorts on size and characteristic).
+    Compare to Ken French's published series at:
+      https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html
+    Metrics: monthly correlation, mean-difference, T-test on return diffs.
+    Acceptance: monthly correlation > 0.85 for all 5 factors + UMD.
+
+  Known concerns from v1:
+    - GME January 2021 dominates microcap value-weighted buckets
+    - Mitigation: report results both with and without microcap names
+    - LaTeX report documents the GameStop episode as a data lesson
+
+  4.5  STAGE 0 DELIVERABLES
+  -------------------------
+    - src/data_reconstruction/ (new package, fully tested)
+    - notebooks/00_data_foundation.ipynb (walkthrough)
+    - reports/sections/00_data_foundation.tex (long, math-heavy)
+    - configs/data_reconstruction.yaml (paths, lag tolerances, etc.)
+    - tests/test_data_reconstruction.py
+    - outputs:
+        data/foundation/raw_panel.parquet         Pre-PIT raw data
+        data/foundation/factor_panel_v2.parquet   Post-PIT, 46 chars
+        data/foundation/cpz_validation.parquet    Per-factor CPZ comparison
+        data/foundation/ff_validation.parquet     FF5 + UMD comparison
+
+
+================================================================================
+  5. THE 11-STAGE PIPELINE (V2)
+================================================================================
+
+================================================================================
+  STAGE 1 — UNIVERSE CONSTRUCTION
+================================================================================
+
+  Objective
+  ---------
+  Define and validate the investable universe as a time-indexed set of
+  stock-months that (a) we could have traded at each historical date, and
+  (b) has stable statistical properties for factor research.
+
+  Mathematical content
+  --------------------
+    - Set-theoretic definition of universe as a filtration F_t
+    - Filter composition:
+          U_t = U_raw_t ∩ size_filter_t ∩ price_filter_t ∩
+                liquidity_filter_t ∩ sector_filter_t
+    - Survivorship audit: trajectory of delisted stocks
+    - NYSE-breakpoint approximation for FF-equivalent subuniverse
+    - Jaccard similarity for month-over-month universe stability
+    - Variance of universe size as function of filter parameters
+
+  Academic references
+  -------------------
+    Banz (1981) - size effect and breakpoints
+    Fama & French (1993) - NYSE breakpoints for size
+    Hou, Xue & Zhang (2020) - universe and filtering choices
+    Shumway (1997) - delisting bias
+    D'Avolio (2002) - stock loan and short-side availability
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/data/universe.py
+    - notebooks/01_universe.ipynb
+    - reports/sections/01_universe.tex
+    - configs/stage01_universe.yaml
+    - tests/test_universe.py
+    - outputs: universe panels (academic_broad, liquid, NYSE-eq) as parquet
+
+  Multiple universes for different stages
+  ---------------------------------------
+    academic_broad: 1967-2024, broad CPZ panel for research stages 2-5
+    liquid: 1991-2024, $5M+ ADV for trading stages 6-10
+    nyse_equivalent: NYSE breakpoint subset for FF-style replication
+
+
+================================================================================
+  STAGE 2 — FACTOR CONSTRUCTION
+================================================================================
+
+  Objective
+  ---------
+  Build alpha-signal factors from the 46 raw characteristics with proper
+  neutralization, standardization.
+  Output is a set of cross-sectionally normalized factor signals per
+  stock-month.
+
+  Mathematical content
+  --------------------
+    - Rank-normalization (CPZ convention): t_i = (rank_i - 0.5) / N - 0.5
+    - Cross-sectional z-scoring as alternative
+    - Sector neutralization via cross-sectional OLS:
+          z = alpha + beta_sector * D_sector + epsilon
+    - Joint sector + size neutralization for value/profitability factors
+    - Rank-duplicate detection and dropping (Spearman > 0.99)
+    - Factor family taxonomy: value, profitability, investment, momentum,
+      risk, other (6 families)
+
+  Cross-family correlations are PRESERVED by design because cross-family relations carry economic content.
+  Multicollinearity between families is the responsibility of Stage 4
+  combination methods to handle.
+
+  Academic references
+  -------------------
+    Fama & French (1992, 1993, 2015) - value, profitability, investment
+    Novy-Marx (2013) - gross profitability
+    Jegadeesh & Titman (1993) - momentum
+    Sloan (1996) - accruals
+    Frazzini & Pedersen (2014) - betting against beta
+    Daniel & Titman (1997) - characteristics vs covariances
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/factors/
+        - definitions.py
+        - neutralization.py
+        - standardization.py
+        - construction.py
+        - pipeline.py
+    - notebooks/02_factor_construction.ipynb
+    - reports/sections/02_factors.tex
+    - configs/stage02_factors.yaml
+    - tests/test_factors.py
+
+
+================================================================================
+  STAGE 3 — FACTOR VALIDATION (REPOSITIONED IN V2)
+================================================================================
+
+  Objective change in V2
+  ----------------------
+  v1 used Stage 3 as a "factor gate": only factors passing all 5 BH-FDR
+  tests proceeded to Stage 4. This led to post-hoc threshold-hunting and
+  arbitrary cutoffs.
+
+  v2 repositions Stage 3 as a DIAGNOSTIC layer that produces statistics
+  on every factor, informing each of Stage 4's four approaches without
+  filtering factors out a priori. All 41 factors proceed to Stage 4;
+  each Stage 4 approach uses Stage 3's diagnostics differently.
+
+  Mathematical content 
+  -------------------------------------
+    - Information Coefficient: monthly Spearman rank correlation
+    - Newey-West HAC standard errors:
+          Var(sqrt(T) * IC_bar) = gamma_0 + 2 sum_{l=1}^{L} w_l gamma_l
+      with Bartlett kernel w_l = 1 - l/(L+1)
+    - Characteristic-based Fama-MacBeth (NOT classical 1973 two-step):
+          r_{i,t+1} = alpha + lambda * z_{i,t,f} + epsilon  per month
+      Distinguished from FM(1973) two-step time-series-betas approach
+    - GRS test (Gibbons-Ross-Shanken 1989) for joint alpha significance
+    - Benjamini-Hochberg FDR for multiple testing
+    - Harvey-Liu-Zhu (2016) haircuts for asset-pricing factor mining
+    - Quintile/decile portfolio sorts: monotonicity slope test
+    - IC decay profile across horizons (1, 3, 12 months)
+    - Spanning tests: factor adds alpha over FF5 + UMD?
+    - Look-ahead audit: same-month vs next-month correlation diagnostic
+    - Pre/post-1986 sub-period stability check
+
+  Output (CHANGED IN V2)
+  ----------------------
+  v1 output: triage_ledger.parquet with PROCEED/REVISE/STOP per factor.
+  v2 output: factor_diagnostics.parquet with full statistics per factor.
+    No PROCEED/STOP labels. All factors pass through to Stage 4.
+
+  Stage 4 will use the diagnostics differently per approach:
+    - Approach 1 (Statistical filtering): filter on diagnostics
+    - Approach 2 (SVD/PCA): use full factor set, transform to PCs
+    - Approach 3 (Regularized regression): use full factor set, let penalty work
+    - Approach 4 (Risk Premium PCA): use full factor set, follow LP 2018 algo
+
+  Academic references
+  -------------------
+    Fama & MacBeth (1973) - cross-sectional regression
+    Newey & West (1987) - HAC covariance
+    Gibbons, Ross & Shanken (1989) - GRS alpha test
+    Benjamini & Hochberg (1995) - FDR procedure
+    Harvey, Liu & Zhu (2016) - t-statistic haircuts
+    McLean & Pontiff (2016) - post-publication factor decay
+    Hou, Xue & Zhang (2020) - replication of factor anomalies
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/validation/
+        - ic.py
+        - fama_macbeth.py
+        - portfolio_sorts.py
+        - quantile_portfolios.py
+        - spanning_tests.py
+        - multiple_testing.py
+        - lookahead_audit.py (NEW: same-month vs next-month diagnostic)
+        - subperiod_stability.py (NEW: pre/post-1986 split)
+        - pipeline.py
+    - notebooks/03_factor_validation.ipynb
+    - reports/sections/03_validation.tex
+    - configs/stage03_validation.yaml
+    - tests/test_validation.py
+    - output: factor_diagnostics.parquet
+
+
+================================================================================
+  STAGE 4 — SIGNAL COMBINATION & MODEL SELECTION (FULLY REDESIGNED IN V2)
+================================================================================
+
+  v1 vs v2
+  --------
+  v1: pick a single combination method (Ridge), fit it, hand off result.
+      Outcome: Ridge composite IC ≈ 0 but spread Sharpe = 1.0; method
+      didn't generalize as expected.
+  v2: implement FOUR approaches, compare on consistent metrics, leaderboard
+      identifies the winner that proceeds to Stage 5.
+
+  THE FOUR APPROACHES (with mathematical content per approach)
+
+  Approach 1: Statistical Filtering + Composite Weighting
+  -------------------------------------------------------
+  Use Stage 3 diagnostics to score factors, then composite the top set.
+
+  Math:
+    - Composite score per factor: weighted vote across 6 tests
+        score_f = w1 * 1{IC_h1 sig} + w2 * 1{IC_h3 sig} + ... + w6 * 1{spread sig}
+    - Robust set: factors with score >= threshold
+    - IC-weighted composite: alpha_i = sum_{f in R} (IC_f / sigma_f) * z_{i,f}
+    - Equal-weight composite as baseline
+    - Mean-variance optimal weights with Ledoit-Wolf shrinkage
+
+  References:
+    Asness, Frazzini, Pedersen (2019) - quality factor combination
+    Ledoit & Wolf (2003) - shrinkage estimation
+    Grinold & Kahn (2000) - optimal IC-weighting
+
+  Approach 2: SVD/PCA Orthogonalization
+  -------------------------------------
+  Transform 41 factors into orthogonal principal components, then combine.
+
+  Math:
+    - SVD of factor matrix: Z = U S V'
+    - Principal components: Z V_k (top k eigenvectors)
+    - Variance explained: sigma_k^2 / sum(sigma_j^2)
+    - PC-based composite: alpha_i = sum_k w_k * PC_{i,k}
+        where w_k can be: equal, IC-weighted, or learned
+    - Selection of k: scree plot, parallel analysis, fixed fraction
+    - Scaling and centering choices: critical to interpretation
+    - Stability of PCs over rolling windows
+    - Comparison to non-orthogonalized starting point
+
+  Why this addresses the multicollinearity issue: PCs are orthogonal by
+  construction, eliminating the BEME-Q -0.86 correlation problem at the
+  combination level rather than relying on Ridge to handle it via penalty.
+
+  References:
+    Connor & Korajczyk (1986, 1988) - PCA in asset pricing
+    Bai & Ng (2002) - determining the number of factors
+    Stock & Watson (2002) - dynamic factor models
+
+  Approach 3: Regularized Regression
+  ----------------------------------
+  Apply Ridge / Lasso / ElasticNet to the original factor matrix.
+
+  Math:
+    - Ridge: argmin ||y - Xw||^2 + lambda ||w||_2^2
+    - Lasso: argmin ||y - Xw||^2 + lambda ||w||_1
+    - ElasticNet: argmin ||y - Xw||^2 + lambda(alpha ||w||_1 + (1-alpha) ||w||_2^2 / 2)
+    - Walk-forward CV with expanding window (or purged + embargo)
+    - Lambda selection grid: log-spaced, wide enough that CV doesn't pick boundary
+    - Annual refit during OOS evaluation
+    - Standardization choices and their consequences
+
+  Lessons from v1 Ridge attempt:
+    - CV may pick smallest lambda in grid → grid was too narrow → check
+    - CV scores diverging from OOS scores → indicates overfit → consider purged CV
+    - OLS-like Ridge produces unstable weights → expected behavior
+
+  References:
+    Hoerl & Kennard (1970) - Ridge regression origin
+    Tibshirani (1996) - Lasso
+    Zou & Hastie (2005) - ElasticNet
+    Lopez de Prado (2018) - Purged CV
+    Gu, Kelly, Xiu (2020) - empirical asset pricing via ML
+
+  Approach 4: Risk Premium PCA (Lettau-Pelger 2018)
+  -------------------------------------------------
+  Modern method that estimates latent factors maximizing risk premium
+  variance, not just total variance. To be implemented when the
+  Lettau-Pelger paper is provided.
+
+  Math (preview, full derivation when paper is in hand):
+    - Standard PCA finds directions of max VARIANCE in returns
+    - LP 2018 finds directions of max RISK PREMIUM (mean) in returns
+    - Optimization: max_v (v' E[r])^2 / (v' Cov(r) v)
+    - Intuition: traditional PCA gives the loudest factors; LP gives
+      the most COMPENSATED factors
+    - Often produces fewer but more economically meaningful components
+
+  Reference:
+    Lettau & Pelger (2018) - Estimating Latent Asset-Pricing Factors
+    [Paper to be provided when Stage 4 implementation begins]
+
+  STAGE 4 LEADERBOARD AND METHOD SELECTION
+
+  Each of the 4 approaches produces a composite alpha signal evaluated
+  on consistent metrics:
+    - Mean cross-sectional IC over OOS period
+    - IC Sharpe (IC mean / IC std, annualized)
+    - Decile-spread mean monthly return
+    - Decile-spread Sharpe (annualized)
+    - Decile monotonicity slope
+    - Realized cumulative spread return
+
+  Leaderboard ranks methods on each metric. Selection rules:
+    Primary: highest decile-spread Sharpe (this is what trading targets)
+    Tiebreaker: highest IC Sharpe (proxies signal stability)
+
+  Diagnostic plots: each method's monthly IC time series,
+                    each method's cumulative spread return,
+                    method ranking heatmap across metrics.
+
+  The winner's composite signal becomes the Stage 5 input. Other methods
+  archived for sensitivity analysis.
+
+  Mathematical content (deep)
+  ---------------------------
+    - Each approach derived in full
+    - Walk-forward CV with expanding window
+    - Newey-West HAC for monthly IC inference
+    - Decile-spread Sharpe with monthly compounding
+    - Multiple-method comparison statistics
+    - Diebold-Mariano test for predictive accuracy comparison
+    - Equal-weight and PC1 composites as benchmarks
+
+  Academic references
+  -------------------
+    Jansen (2018, 2020) - ML for trading framework
+    Connor & Korajczyk (1986, 1988) - PCA in asset pricing
+    Lettau & Pelger (2018) - Risk Premium PCA
+    Hoerl & Kennard (1970) - Ridge regression
+    Tibshirani (1996) - Lasso
+    Zou & Hastie (2005) - ElasticNet
+    Lopez de Prado (2018) - purged CV
+    Diebold & Mariano (1995) - predictive accuracy comparison
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/alpha/
+        - features.py (target construction, dataset preparation)
+        - cv.py (walk-forward CV, scoring functions)
+        - benchmarks.py (equal-weight, PC1)
+        - statistical.py (NEW: Approach 1 — composite weighting)
+        - transformation.py (NEW: Approach 2 — SVD/PCA)
+        - shrinkage.py (Approach 3 — Ridge/Lasso/ElasticNet wrappers)
+        - risk_premium_pca.py (NEW: Approach 4 — Lettau-Pelger)
+        - combination.py (per-method walk-forward refitting)
+        - leaderboard.py (NEW: scoring + ranking + plotting)
+        - comparison.py (NEW: Diebold-Mariano, paired tests)
+        - pipeline.py (orchestrator: runs all 4 approaches)
+    - notebooks/04_signal_combination.ipynb (leaderboard-driven)
+    - reports/sections/04_alpha.tex (~30 pages with all 4 approaches)
+    - configs/stage04_alpha.yaml (each approach's hyperparams)
+    - tests/test_alpha.py (>= 50 tests covering all 4 approaches)
+    - outputs:
+        composite_alpha.parquet              one row per (stock, month, method)
+        leaderboard.parquet                  ranked methods on metrics
+        per-method weights/loadings          for diagnostics
+
+
+================================================================================
+  STAGE 5 — RISK MODELING
+================================================================================
+
+  Objective
+  ---------
+  Build a cross-sectional fundamental factor risk model that decomposes
+  portfolio risk into factor exposures and idiosyncratic components. Extend
+  with GARCH-NIG innovations.
+
+  5A. Baseline BARRA-style risk model
+
+  Mathematical content
+  --------------------
+    - Structural model: r_{i,t} = sum_k B_{i,k,t-1} f_{k,t} + e_{i,t}
+    - Cross-sectional weighted least squares for factor returns f_{k,t}
+    - Factor covariance estimation F_t: EWMA, shrinkage, GARCH
+    - Idiosyncratic variance D_t: EWMA per stock
+    - Full covariance: Sigma_t = B_t F_t B_t' + D_t
+    - Newey-West for serial correlation in factor returns
+    - Bayesian shrinkage for unstable factors
+
+  5B. GARCH-NIG extension
+
+  Mathematical content
+  --------------------
+    - ARMA(p,q) mean for each factor time series
+    - GARCH(1,1) on standardized innovations:
+          sigma_{k,t}^2 = omega + alpha * eps_{k,t-1}^2 + beta * sigma_{k,t-1}^2
+    - NIG distribution for innovations z_{k,t} ~ NIG(alpha, beta, mu, delta)
+    - DCC-GARCH (Engle 2002) for correlation dynamics
+    - Multivariate NIG copula for joint factor distribution
+    - Per-stock idiosyncratic GARCH on residuals
+
+  5C. Model validation
+
+  Mathematical content
+  --------------------
+    - Bias statistic: BARRA's standard model test
+    - VaR backtesting: Kupiec POF, Christoffersen independence
+    - Risk attribution: decompose realized portfolio variance
+    - Out-of-sample comparison: baseline vs GARCH-NIG
+
+  Academic references
+  -------------------
+    Rosenberg (1974) - BARRA factor model origin
+    MSCI BARRA USE4 Handbook - structural risk models
+    Engle (2002) - DCC-GARCH
+    Bollerslev (1986) - GARCH
+    Barndorff-Nielsen (1997) - NIG distribution
+    van der Weide (2002) - GO-GARCH
+    Menn & Rachev (2005) - NIG in finance
+    Kupiec (1995) - VaR coverage tests
+    Christoffersen (1998) - conditional VaR tests
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/risk/
+        - barra.py
+        - factor_returns.py
+        - covariance.py
+        - idiosyncratic.py
+        - garch_nig.py
+        - dcc_garch.py
+        - validation.py
+    - notebooks/05_risk.ipynb
+    - reports/sections/05_risk.tex (long, math-heavy)
+    - tests/test_risk.py
+    - outputs: risk_model_baseline.parquet, risk_model_garch_nig.parquet
+
+
+================================================================================
+  STAGE 6 — TRANSACTION COST MODEL
+================================================================================
+
+  Objective
+  ---------
+  Model trading costs realistically: spread, market impact, borrow.
+
+  Mathematical content
+  --------------------
+    - Spread cost: half-spread times trade notional
+    - Market impact (square-root law):
+          MI = sigma * sqrt(Q / ADV)
+    - Almgren-Chriss (2000) framework: temporary + permanent impact
+    - Borrow cost for short leg: GC vs special distribution
+    - Opportunity cost of unfilled orders
+
+  Academic references
+  -------------------
+    Almgren & Chriss (2000) - optimal execution
+    D'Avolio (2002) - stock loan market
+    Frazzini, Israel & Moskowitz (2015) - AQR trading costs study
+    Kyle (1985) - price impact theory
+    Obizhaeva & Wang (2013) - impact models
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/costs/
+        - spread.py
+        - impact.py
+        - borrow.py
+        - total.py
+    - notebooks/06_costs.ipynb
+    - reports/sections/06_costs.tex
+    - tests/test_costs.py
+
+
+================================================================================
+  STAGE 7 — PORTFOLIO CONSTRUCTION
+================================================================================
+
+  Objective
+  ---------
+  Turn alpha forecasts + risk model into portfolio weights.
+
+  Mathematical content
+  --------------------
+    - Mean-variance optimization:
+          max_w alpha'w - (lambda/2) w' Sigma w - TC(w, w_prev)
+      s.t. constraints
+    - Constraint set:
+        - Dollar neutrality
+        - Gross leverage cap
+        - Position size cap (GameStop lesson)
+        - Sector exposure limits
+        - Beta neutrality
+        - Turnover cap
+        - ADV participation
+        - Factor exposure limits
+    - Transaction cost penalty: linear (spread) + quadratic (impact)
+    - QP solver: CVXPY backend (OSQP free; MOSEK if licensed)
+    - Warm-starting from previous period
+    - Dual values for Lagrangian interpretation
+
+  Academic references
+  -------------------
+    Markowitz (1952) - mean-variance foundation
+    Black & Litterman (1992) - blended views with prior
+    Grinold & Kahn (2000) - Active Portfolio Management
+    Almgren & Chriss (2000) - optimal execution
+    Clarke, de Silva & Thorley (2002) - long-short construction
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/portfolio/
+        - optimizer.py
+        - constraints.py
+        - objective.py
+        - warm_start.py
+    - notebooks/07_portfolio.ipynb
+    - reports/sections/07_portfolio.tex
+    - configs/stage07_portfolio.yaml
+    - tests/test_portfolio.py
+
+
+================================================================================
+  STAGE 8 — BACKTEST ENGINE
+================================================================================
+
+  Objective
+  ---------
+  Simulate full strategy P&L with realistic execution, costs, borrow,
+  delisting handling. Two variants: vectorized (fast) and event-driven
+  (realistic).
+
+  Mathematical content
+  --------------------
+    - Path integral of portfolio returns with costs:
+          PnL_t = sum_i w_{i,t-1} r_{i,t} - sum_i TC(w_{i,t}, w_{i,t-1})
+    - Slippage modeling: actual fill price vs decision price
+    - Delisting-month handling
+    - Walk-forward with purged CV
+    - Sharpe, Information Ratio, drawdown, turnover, capacity
+    - Deflated Sharpe Ratio for multi-trial backtest correction
+
+  Academic references
+  -------------------
+    Bailey & Lopez de Prado (2014) - deflated Sharpe ratio
+    Harvey & Liu (2015) - backtest overfitting
+    Lopez de Prado (2018) - Advances in FinML
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/backtest/
+        - vectorized.py
+        - event_driven.py
+        - metrics.py
+    - notebooks/08_backtest.ipynb
+    - reports/sections/08_backtest.tex
+    - tests/test_backtest.py
+    - output: backtest_results.parquet
+
+
+================================================================================
+  STAGE 9 — ATTRIBUTION AND DIAGNOSTICS
+================================================================================
+
+  Objective
+  ---------
+  Decompose realized P&L into factor exposures, stock selection, timing,
+  and costs.
+
+  Mathematical content
+  --------------------
+    - Brinson-Fachler attribution adapted for factor models
+    - Realized vs expected factor exposure tracking
+    - Alpha stability: realized IC vs backtested IC
+    - Active return decomposition:
+          R_active = R_factor_tilt + R_stock_selection + R_timing + R_costs
+    - Style drift detection via rolling factor exposure
+    - Crowding proxies (correlation with peer factor returns)
+
+  Academic references
+  -------------------
+    Brinson, Hood & Beebower (1986) - attribution foundation
+    Grinold & Kahn (2000) - factor attribution
+    MSCI BARRA Handbook
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/attribution/
+        - factor_decomp.py
+        - pnl_decomp.py
+        - style_drift.py
+    - notebooks/09_attribution.ipynb
+    - reports/sections/09_attribution.tex
+    - tests/test_attribution.py
+
+
+================================================================================
+  STAGE 10 — PAPER TRADING DEPLOYMENT (ALPACA)
+================================================================================
+
+  Objective
+  ---------
+  Deploy strategy on Alpaca paper trading. End-to-end: read data, compute
+  signals, optimize, submit orders, reconcile.
+
+  Technical content (less mathematical, more engineering)
+  -------------------------------------------------------
+    - Alpaca REST API for account, positions, orders
+    - Alpaca WebSocket for real-time fills
+    - Idempotent order submission (deduplicate on client_order_id)
+    - Pre-trade checks (notional, concentration, leverage)
+    - Order routing: limit-IOC or market-on-close
+    - Reconciliation: our book vs Alpaca book
+    - Kill switches and error handling
+    - Logging and persistence
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/execution/
+        - alpaca_client.py
+        - order_manager.py
+        - reconcile.py
+        - pre_trade_checks.py
+    - notebooks/10_deployment.ipynb
+    - reports/sections/10_deployment.tex (shorter, less math)
+    - configs/stage10_deployment.yaml
+    - tests/test_execution.py (mocked API)
+
+
+================================================================================
+  STAGE 11 — MONITORING AND OPERATIONS
+================================================================================
+
+  Objective
+  ---------
+  Keep the strategy alive: monitor performance, detect data issues,
+  alert on anomalies.
+
+  Technical content
+  -----------------
+    - Dashboard: realized PnL, exposures, turnover
+    - Alerts: drawdown > threshold, data quality issues, order failures
+    - Daily attribution report generation
+    - Signal decay monitoring: realized IC drift vs backtested
+    - Operational logs and error rollups
+
+  Deliverables
+  ------------
+    - src/factor_pipeline/monitoring/
+        - dashboard.py
+        - alerts.py
+        - daily_report.py
+    - notebooks/11_monitoring.ipynb
+    - configs/stage11_monitoring.yaml
+
+
+================================================================================
+  6. ARCHITECTURE AND TOOLING (V2 UPDATES)
+================================================================================
+
+  6.1  DIRECTORY LAYOUT (V2)
+  --------------------------
+  equity-fundamental-factor-investing/
+    +-- pyproject.toml
+    +-- README.md
+    +-- ROADMAP.txt
+    +-- environment.yml
+    +-- src/
+    |   +-- data_reconstruction/    (NEW: Stage 0 standalone package)
+    |   |   +-- raw_data/
+    |   |   +-- characteristics/
+    |   |   +-- pit/
+    |   |   +-- validation/
+    |   +-- factor_pipeline/
+    |       +-- __init__.py
+    |       +-- data/               Stage 1: universe filters
+    |       +-- factors/            Stage 2: construction
+    |       +-- validation/         Stage 3: diagnostics layer (REPOSITIONED)
+    |       +-- alpha/              Stage 4: 4-method comparison (EXPANDED)
+    |       |   +-- features.py
+    |       |   +-- cv.py
+    |       |   +-- benchmarks.py
+    |       |   +-- statistical.py        (Approach 1)
+    |       |   +-- transformation.py     (Approach 2: PCA — NEW)
+    |       |   +-- shrinkage.py          (Approach 3)
+    |       |   +-- risk_premium_pca.py   (Approach 4: LP 2018 — NEW)
+    |       |   +-- combination.py
+    |       |   +-- leaderboard.py        (NEW)
+    |       |   +-- comparison.py         (NEW: Diebold-Mariano etc)
+    |       |   +-- pipeline.py
+    |       +-- risk/               Stage 5
+    |       +-- portfolio/          Stage 7
+    |       +-- costs/              Stage 6
+    |       +-- backtest/           Stage 8
+    |       +-- attribution/        Stage 9
+    |       +-- execution/          Stage 10
+    |       +-- monitoring/         Stage 11
+    |       +-- utils/
+    +-- notebooks/
+    |   +-- 00_data_foundation.ipynb        (NEW)
+    |   +-- 01_universe.ipynb
+    |   +-- 02_factor_construction.ipynb
+    |   +-- 03_factor_validation.ipynb
+    |   +-- 04_signal_combination.ipynb     (REDESIGNED)
+    |   +-- 05_risk.ipynb
+    |   +-- 06_costs.ipynb
+    |   +-- 07_portfolio.ipynb
+    |   +-- 08_backtest.ipynb
+    |   +-- 09_attribution.ipynb
+    |   +-- 10_deployment.ipynb
+    |   +-- 11_monitoring.ipynb
+    +-- tests/
+    +-- configs/
+    +-- reports/
+    |   +-- main.tex
+    |   +-- sections/
+    |   |   +-- 00_data_foundation.tex      (NEW)
+    |   |   +-- 01_universe.tex
+    |   |   +-- 02_factors.tex
+    |   |   +-- 03_validation.tex
+    |   |   +-- 04_alpha.tex                (EXPANDED for 4 approaches)
+    |   |   +-- 05_risk.tex
+    |   |   +-- 06_costs.tex
+    |   |   +-- 07_portfolio.tex
+    |   |   +-- 08_backtest.tex
+    |   |   +-- 09_attribution.tex
+    |   |   +-- 10_deployment.tex
+    |   |   +-- 11_monitoring.tex
+    |   |   +-- 12_discussion.tex
+    |   |   +-- appendix_notation.tex
+    |   |   +-- appendix_proofs.tex
+    |   +-- references.bib
+    |   +-- figures/
+    +-- scripts/
+    |   +-- run_stage.py
+    +-- data/                       Gitignored
+
+  6.2  CORE LIBRARIES
+  -------------------
+    Data:           pandas, numpy, pyarrow
+    Stats:          statsmodels, scipy, arch (GARCH)
+    Optimization:   cvxpy, scipy.optimize
+    ML:             scikit-learn, lightgbm
+    PCA / SVD:      scikit-learn, scipy.linalg, numpy.linalg
+    Plotting:       plotly (interactive), matplotlib (LaTeX figs)
+    Testing:        pytest, pytest-cov
+    Config:         pyyaml
+    WRDS:           wrds-py
+    Execution:      alpaca-py, requests
+    Notebooks:      jupyter, nbformat
+
+  6.3  CODING CONVENTIONS
+  -----------------------
+    - Type hints everywhere
+    - Docstrings in NumPy style
+    - Black + isort for formatting
+    - Ruff for linting
+    - Pytest for all tests
+    - Config via YAML, validated via dataclasses
+
+  6.4  LATEX REPORT STRUCTURE (V2)
+  --------------------------------
+    0.  Abstract + Executive summary
+    1.  Introduction (goal, scope, contribution)
+    2.  Notation table
+    3.  Stage 0: Data foundation (CPZ + KF validation)
+    4.  Stage 1: Universe construction
+    5.  Stage 2: Factor construction
+    6.  Stage 3: Factor validation (diagnostics layer)
+    7.  Stage 4: Signal combination & model selection (4-approach comparison)
+    8.  Stage 5: Risk modeling (primary mathematical section)
+    9.  Stage 6: Transaction costs
+    10. Stage 7: Portfolio construction
+    11. Stage 8: Backtest
+    12. Stage 9: Attribution
+    13. Stage 10: Deployment
+    14. Stage 11: Monitoring
+    15. Results synthesis and discussion
+    16. Limitations and future work
+    17. Appendices
+
+
+================================================================================
+  7. DEVELOPMENT WORKFLOW (V2)
+================================================================================
+
+  7.1  PER-STAGE RHYTHM (V2)
+  --------------------------
+    (1) MATH FRAMEWORK FIRST: build the full mathematical foundation
+        - All formulas with derivations
+        - All assumptions explicit
+        - All references cited
+        - Alternatives considered
+        - Criticism documented
+        - User reviews and locks the math
+    (2) Code: implement modules with tests
+    (3) Notebook: walkthrough that imports from src/
+    (4) LaTeX section: write WITH the stage, not after
+    (5) Validate end-to-end
+    (6) Move to next stage only when current is bulletproof
+
+  7.2  COMMUNICATION
+  ------------------
+    - Collaborator pushes back on user's design choices
+    - User pushes back on collaborator's claims
+    - Every uncertain claim flagged as such
+    - No post-hoc filtering or threshold-hunting
+    - Decisions locked in writing before execution
+    - Surprising results reported as-is
+
+  7.3  OUTPUT DISCIPLINE
+  ----------------------
+    - Do not move on with known bugs
+    - Notebooks reproducible (kernel restart + run all)
+    - Tests pass on main branch
+    - LaTeX compiles without errors
+    - Each src/ module has docstring explaining its place in pipeline
+
+
+================================================================================
+  8. ACADEMIC REFERENCES (CORE BIBLIOGRAPHY)
+================================================================================
+
+  8.1  ASSET PRICING FOUNDATIONS
+  ------------------------------
+    Sharpe (1964) - CAPM
+    Fama & French (1992, 1993, 2015) - three-factor, five-factor
+    Carhart (1997) - momentum factor
+    Hou, Xue & Zhang (2015) - q-factor model
+    Stambaugh & Yuan (2017) - mispricing factors
+
+  8.2  FACTOR ANOMALIES
+  ---------------------
+    Jegadeesh & Titman (1993) - momentum
+    Sloan (1996) - accruals
+    Cooper, Gulen & Schill (2008) - asset growth
+    Novy-Marx (2013) - gross profitability
+    Frazzini & Pedersen (2014) - betting against beta
+    Asness, Frazzini & Pedersen (2019) - quality
+    Freyberger, Neuhierl & Weber (2020) - nonparametric factors
+    Chen, Pelger & Zhu (2024) - deep learning in asset pricing
+
+  8.3  STATISTICAL METHODS
+  ------------------------
+    Newey & West (1987) - HAC
+    Benjamini & Hochberg (1995) - FDR
+    Gibbons, Ross & Shanken (1989) - GRS
+    Fama & MacBeth (1973) - cross-sectional regression
+    Harvey, Liu & Zhu (2016) - t-haircuts
+    Diebold & Mariano (1995) - predictive accuracy comparison
+
+  8.4  SIGNAL COMBINATION (NEW IN V2)
+  -----------------------------------
+    Connor & Korajczyk (1986, 1988) - PCA in asset pricing
+    Bai & Ng (2002) - determining number of factors
+    Stock & Watson (2002) - dynamic factor models
+    Hoerl & Kennard (1970) - Ridge regression
+    Tibshirani (1996) - Lasso
+    Zou & Hastie (2005) - ElasticNet
+    Lettau & Pelger (2018) - Risk Premium PCA
+    Lopez de Prado (2018) - purged CV
+    Gu, Kelly, Xiu (2020) - empirical asset pricing via ML
+
+  8.5  RISK MODELING
+  ------------------
+    Rosenberg (1974) - BARRA origin
+    Engle (2002) - DCC-GARCH
+    Bollerslev (1986) - GARCH
+    Barndorff-Nielsen (1997) - NIG distribution
+    van der Weide (2002) - GO-GARCH
+
+  8.6  PORTFOLIO CONSTRUCTION
+  ---------------------------
+    Markowitz (1952) - mean-variance
+    Black & Litterman (1992) - Bayesian blending
+    Grinold & Kahn (2000) - Active Portfolio Management
+
+  8.7  TRANSACTION COSTS AND EXECUTION
+  ------------------------------------
+    Almgren & Chriss (2000) - optimal execution
+    Kyle (1985) - informed trading impact
+    D'Avolio (2002) - stock loan
+    Frazzini, Israel & Moskowitz (2015) - AQR trading costs
+
+  8.8  BACKTESTING DISCIPLINE
+  ---------------------------
+    Bailey & Lopez de Prado (2014) - deflated Sharpe
+    Harvey & Liu (2015) - backtest overfitting
+    Lopez de Prado (2018) - Advances in Financial ML
+    McLean & Pontiff (2016) - post-publication factor decay
+
+
+================================================================================
+  9. RISK REGISTER
+================================================================================
+
+  9.1  PROJECT EXECUTION RISKS
+  ----------------------------
+    (a) Scope expansion in Stage 4 (4 approaches vs 1). Already accepted
+        in v2. Mitigation: leaderboard discipline; don't try to make all
+        4 win, let the data choose.
+    (b) Stage 5 risk model complexity (BARRA + GARCH-NIG). Mitigation:
+        baseline first, then extend.
+    (c) LaTeX rot: write with each stage, not after.
+
+  9.2  TECHNICAL RISKS
+  --------------------
+    (d) Look-ahead bias. Mitigation: PIT audits at every stage,
+        purged CV in Stage 4 if needed.
+    (e) Risk model numerical issues (singular F_t). Mitigation:
+        shrinkage, regularization.
+    (f) Backtest overfitting. Mitigation: walk-forward + holdout +
+        deflated Sharpe.
+    (g) GARCH-NIG convergence. Mitigation: low-dim factor universe,
+        method-of-moments init.
+
+  9.3  RESEARCH RISKS
+  -------------------
+    (h) Stage 4 leaderboard winner is unstable across CV folds.
+        Mitigation: report top-2 methods if first/second are within 0.1
+        Sharpe of each other.
+    (i) All 4 methods produce similar IC. Mitigation: still useful as
+        consistency check; pick simplest method.
+    (j) Risk Premium PCA produces dramatically different result from
+        traditional PCA. Mitigation: this is informative; report both
+        with discussion of why.
+    (k) Post-2016 factor performance is weak. Mitigation: be honest;
+        thesis is "rigorous pipeline," not "this strategy makes money."
+    (l) Strategy depends heavily on microcap names (GameStop concern).
+        Mitigation: cap concentration in Stage 7; report liquid-only
+        results separately.
+
+
+================================================================================
+  10. OPEN QUESTIONS AND DEFERRED DECISIONS
+================================================================================
+
+  10.1  IMMEDIATE FOR STAGE 0
+  ---------------------------
+    - Final list of 46 characteristics with complete equations and citations
+    - Choice of merge_asof tolerance (380 vs 548 days)
+    - Audit fixes from v1 — all retained, documented
+    - Validation thresholds for CPZ overlap and FF7 comparison
+
+  10.2  DEFERRED TO STAGE 1
+  -------------------------
+    - Exact market cap floor for liquid universe
+    - Exact ADV threshold
+    - Whether to include or exclude ADRs/REITs
+
+  10.3  DEFERRED TO STAGE 2
+  -------------------------
+    - Final factor list (drop rank-duplicates per audit)
+    - Sector neutralization choice (drop sectors or regress out)
+    - Rank vs z-score representation
+
+  10.4  DEFERRED TO STAGE 4
+  -------------------------
+    - Number of PCs to retain in Approach 2
+    - Lambda grid for Approach 3 (must be wider than v1's grid)
+    - Lettau-Pelger paper specifics (when paper provided)
+    - Leaderboard tiebreaker rules
+    - Whether to use purged + embargoed CV instead of expanding-window
+
+  10.5  DEFERRED TO STAGE 5
+  -------------------------
+    - Multivariate GARCH flavor: DCC vs GO-GARCH vs copula-GARCH
+    - Whether to use t-copula or NIG-based copula
+    - Factor universe for risk model (5 FF + 46 style or reduced)
+
+  10.6  DEFERRED TO STAGE 7
+  -------------------------
+    - Risk aversion parameter lambda: calibrate to target volatility
+    - Turnover cap: pick via capacity analysis
+    - Solver: CVXPY default vs MOSEK
+
+  10.7  DEFERRED TO STAGE 10
+  --------------------------
+    - Execution cadence: monthly point-in-time vs staggered
+    - Order type: market-on-close, VWAP, or limit IOC
+
+
+================================================================================
+  END OF ROADMAP V2
+================================================================================

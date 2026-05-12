@@ -1,0 +1,3 @@
+# This directory holds small test fixture files (sample parquets, etc.).
+# Files here MAY be committed to git (unlike the top-level data/ directory).
+# Keep fixtures small (< 1 MB each) to avoid bloating the repo.

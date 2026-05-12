@@ -1,0 +1,701 @@
+% =============================================================================
+% Stage 0 — Document 1: Foundation and Methodology
+%
+% This is the first of three documents establishing the mathematical
+% framework for Stage 0 (Data Foundation). It covers the methodological
+% scaffolding: data sources, point-in-time mechanics, key adjustments,
+% and the rank-normalization that delivers the final panel.
+%
+% Document 2 (forthcoming): mathematical definitions of all 46 characteristics
+% Document 3 (forthcoming): validation methodology (CPZ + Fama-French arms)
+%
+% This file is intended for inclusion in reports/sections/00_data_foundation.tex.
+% Citation keys in \cite{...} reference reports/references.bib.
+% =============================================================================
+
+\section{Stage 0: Data Foundation}
+\label{sec:stage0}
+
+\subsection{Overview and Project Context}
+\label{subsec:stage0-context}
+
+Stage 0 reconstructs the firm-characteristic panel of \cite{ChenPelgerZhu2024}
+(hereafter \emph{CPZ}) from raw CRSP and Compustat sources, extending it
+through 2024. The output is a monthly panel of US common stocks
+(1967--2024) carrying \(46\) firm characteristics constructed per
+\cite{FreybergerNeuhierlWeber2020} (hereafter \emph{FNW}), excess returns,
+market equity, and identifiers.
+
+The choice of CPZ as the reference panel is not incidental. CPZ provides
+one of the most carefully validated academic factor datasets for US
+equities, and its factor list has become a de facto standard in the
+asset-pricing replication literature. Reconstructing CPZ rather than
+defining a fresh panel grants two benefits: \emph{(i)} every nontrivial
+construction choice is anchored in published methodology, and \emph{(ii)}
+we obtain a quantitative validation target via direct comparison against
+the published CPZ panel over its 1967--2016 sample.
+
+The 8-year extension (2017--2024) covers economic regimes that the
+original CPZ sample does not include: the 2018 trade tensions, the 2020
+COVID crash and recovery, the 2022 inflation/rate-shock regime, and the
+post-hike recovery. These years are validated against published
+Fama-French factor returns from Kenneth French's data library, since
+no published characteristic panel exists for direct comparison there.
+
+This is the only stage of the project that touches raw vendor data.
+Stages 1--11 consume Stage 0's output panel as a fixed input. The
+correctness of Stage 0 is therefore a structural prerequisite for the
+entire pipeline.
+
+\subsubsection{Module Structure}
+
+Stage 0 is organized as a standalone Python package
+\texttt{src/data\_reconstruction/} with the following submodules
+(specified in v2 ROADMAP \S 4.2):
+
+\begin{itemize}
+\item \texttt{raw\_data/}: vendor data loaders (CRSP monthly, CRSP daily,
+      Compustat fundamentals, Fama-French factors, delisting adjustments)
+\item \texttt{characteristics/}: one module per family
+      (\texttt{value.py}, \texttt{profitability.py}, \texttt{investment.py},
+      \texttt{momentum.py}, \texttt{risk.py}, \texttt{liquidity.py},
+      \texttt{other.py})
+\item \texttt{pit/}: point-in-time merge logic and PIT-correctness audits
+\item \texttt{validation/}: CPZ comparison (1967--2016) and Fama-French
+      replication (2017--2024)
+\item \texttt{pipeline.py}: orchestrator that produces the final panel
+\end{itemize}
+
+Each submodule is independently testable. The \texttt{pipeline.py}
+orchestrator wires them together but contains no construction logic
+itself.
+
+\subsection{Raw Data Sources}
+\label{subsec:stage0-raw}
+
+\subsubsection{CRSP Monthly Stock File (MSF)}
+
+The CRSP MSF is the canonical record of US common-stock returns and
+market equity at monthly frequency. We pull
+1960-01--2024-12 (extending to 1960 even though our sample starts in
+1967, so that 12-month momentum signals
+$r_{12,2}$, $r_{12,7}$, etc.\ have a full lookback at sample start).
+
+Required fields: \texttt{permno}, \texttt{date} (month-end),
+\texttt{ret} (raw monthly return), \texttt{prc} (closing price,
+sign-coded for bid-ask midpoint), \texttt{shrout} (shares outstanding,
+in thousands), \texttt{vol} (monthly volume, in shares),
+\texttt{cfacshr} (cumulative share-adjustment factor),
+\texttt{cfacpr} (cumulative price-adjustment factor),
+\texttt{shrcd} (share code), \texttt{exchcd} (exchange code),
+\texttt{siccd} (SIC industry code), \texttt{ticker}, \texttt{comnam}.
+
+We restrict to common stock (\texttt{shrcd} $\in \{10, 11\}$) on NYSE,
+AMEX, or NASDAQ (\texttt{exchcd} $\in \{1, 2, 3\}$). This filter is
+applied at load time, not at universe construction (Stage 1), because
+non-common-stock observations carry vendor inconsistencies that pollute
+construction even when we never trade them.
+
+Market equity is computed as
+\begin{equation}
+\mathrm{ME}_{i,t} = |\mathrm{prc}_{i,t}| \cdot \mathrm{shrout}_{i,t} \cdot 1000,
+\label{eq:me-defn}
+\end{equation}
+expressed in dollars (CRSP reports \texttt{shrout} in thousands).
+
+\subsubsection{CRSP Daily Stock File (DSF)}
+
+The DSF is required for risk characteristics computed via 252-day
+rolling regressions: \(\beta\), \(\mathrm{IdioVol}\),
+\(\mathrm{Resid\_Var}\), \(\mathrm{Variance}\), and the
+Roll \cite{Roll1984} implied spread.
+
+Pulled fields: \texttt{permno}, \texttt{date}, \texttt{ret} (daily raw
+return). The DSF is large (\(\sim\)60M rows over 1963--2024, \(\sim\)715
+MB on disk). We pull from 1963 onward so that 252-day windows for
+1967-01-31 estimates are fully populated.
+
+\subsubsection{Compustat Annual Fundamentals}
+
+Compustat \texttt{funda} provides the balance-sheet, income-statement,
+and cash-flow data behind the 20 accounting characteristics. Pulled
+fields cover the items required by FNW definitions, including
+\texttt{at}, \texttt{lt}, \texttt{seq}, \texttt{ceq}, \texttt{pstk},
+\texttt{pstkrv}, \texttt{pstkl}, \texttt{txditc}, \texttt{ib},
+\texttt{ni}, \texttt{revt}, \texttt{sale}, \texttt{cogs}, \texttt{xsga},
+\texttt{xint}, \texttt{dp}, \texttt{dv}, \texttt{dltt}, \texttt{dlc},
+\texttt{act}, \texttt{lct}, \texttt{che}, \texttt{intan},
+\texttt{ppent}, and \texttt{invt}.
+
+We retain only primary-link records (\texttt{linkprim} $\in \{P, C\}$)
+from the CRSP-Compustat link table. This eliminates duplicate
+permno-datadate observations that arise when a single CRSP security
+maps to multiple Compustat \texttt{gvkey} records (typically through
+mergers or restatements). Primary-link selection is the standard
+WRDS-CCM convention.
+
+\subsubsection{Fama-French Factors}
+
+Used at two layers. The risk-free rate \(r_{f,t}\) is required to
+construct excess returns
+\(r^{ex}_{i,t} = r_{i,t} - r_{f,t}\). Daily and monthly FF factors
+both come directly from Kenneth French's data library via WRDS.
+
+The FF research factors (HML, RMW, CMA, UMD) themselves are not
+Stage 0 outputs. They appear in Stage 0 only as validation targets
+in \S\ref{subsec:stage0-rationale-summary} below; the construction
+methodology for our FF5+UMD replication is detailed in Document 3.
+
+\subsubsection{CRSP Delisting Returns}
+
+CRSP separately reports \texttt{dlret}, the return realized in the
+delisting month. This must be folded into the standard return series;
+otherwise we systematically lose the delisting-month return and incur
+survivorship bias. The merge logic is detailed in
+\S\ref{subsec:stage0-shumway} below.
+
+\subsection{Excess Returns and the Delisting Adjustment}
+\label{subsec:stage0-shumway}
+
+\subsubsection{The delisting bias}
+
+CRSP \texttt{ret} reports the holding-period return for stocks alive
+through the month-end. For stocks that delist mid-month, no entry
+appears in \texttt{ret} for the delisting month; the delisting-month
+return is reported separately in \texttt{dlret}. Failing to merge
+\texttt{dlret} into the return series biases backtests upward by
+omitting losses from delisted stocks.
+
+\cite{Shumway1997} documented this bias and proposed an imputation
+rule: when a stock delists for cause and \texttt{dlret} is missing,
+assign a return based on the delisting code (\texttt{dlstcd}). The
+canonical imputations are:
+
+\begin{itemize}
+\item \(\mathrm{dlstcd} \in \{500\} \cup [520, 584]\): performance-related
+      delistings (e.g., insufficient capital, liquidation). Impute
+      \(r = -0.30\) for NYSE/AMEX, \(r = -0.55\) for NASDAQ.
+\item \(\mathrm{dlstcd} = 100\): still-active or merged. Use
+      \texttt{dlret} if available, else 0 (no return information lost).
+\item Other codes (e.g., 200--499 for ordinary delistings): use
+      \texttt{dlret} if available, else \(r = 0\).
+\end{itemize}
+
+\subsubsection{Merge logic}
+
+For a stock-month \((i, t)\) where \(i\) delisted in month \(t\):
+\begin{equation}
+r_{i,t} =
+\begin{cases}
+\mathrm{dlret}_{i,t}, & \text{if } \mathrm{dlret}_{i,t} \neq \text{NA} \\
+-0.30, & \text{if } \mathrm{dlstcd}_i \in \mathcal{D}_{\text{perf}}
+        \text{ and exchange} \in \{\text{NYSE/AMEX}\} \\
+-0.55, & \text{if } \mathrm{dlstcd}_i \in \mathcal{D}_{\text{perf}}
+        \text{ and exchange} = \text{NASDAQ} \\
+0, & \text{otherwise}
+\end{cases}
+\label{eq:shumway-imputation}
+\end{equation}
+
+where \(\mathcal{D}_{\text{perf}} = \{500\} \cup \{520, 521, \ldots, 584\}\)
+is the set of performance-related delisting codes.
+
+After this imputation, the excess return is computed as
+\begin{equation}
+r^{ex}_{i,t} = r_{i,t} - r_{f,t}.
+\label{eq:excess-return-defn}
+\end{equation}
+
+\subsection{Book Equity: Davis-Fama-French (2000) Definition}
+\label{subsec:stage0-be}
+
+Book equity \(\mathrm{BE}_{i,t}\) is the denominator of multiple value
+characteristics (BEME, $\mathrm{BE}/\mathrm{ME}$). Compustat does not
+report book equity directly; it must be constructed from balance-sheet
+items, and several legitimate definitions exist. We follow
+\cite{DavisFamaFrench2000}, which is the dominant academic convention.
+
+\subsubsection{Stockholders' equity hierarchy}
+
+Stockholders' equity \(\mathrm{SE}\) is constructed with the following
+priority:
+\begin{equation}
+\mathrm{SE}_{i,t} =
+\begin{cases}
+\mathrm{seq}_{i,t}, & \text{if } \mathrm{seq}_{i,t} \neq \text{NA} \\
+\mathrm{ceq}_{i,t} + \mathrm{pstk}_{i,t}, & \text{else if } \mathrm{ceq}_{i,t} \neq \text{NA} \\
+\mathrm{at}_{i,t} - \mathrm{lt}_{i,t}, & \text{otherwise}.
+\end{cases}
+\label{eq:se-hierarchy}
+\end{equation}
+
+The hierarchy reflects increasing approximation. \texttt{seq} is the
+direct stockholders' equity figure (best). \texttt{ceq + pstk} is the
+common-equity figure plus preferred stock (still good). The book-value
+identity \texttt{at - lt} is the residual approximation, used only when
+neither of the prior two is available.
+
+\subsubsection{Preferred stock hierarchy}
+
+Preferred stock \(\mathrm{PS}\) is constructed in priority order:
+\begin{equation}
+\mathrm{PS}_{i,t} =
+\begin{cases}
+\mathrm{pstkrv}_{i,t}, & \text{if } \mathrm{pstkrv}_{i,t} \neq \text{NA}
+                       \quad \text{(redemption value)}\\
+\mathrm{pstkl}_{i,t}, & \text{else if } \mathrm{pstkl}_{i,t} \neq \text{NA}
+                       \quad \text{(liquidating preference)}\\
+\mathrm{pstk}_{i,t}, & \text{otherwise (carrying value)}.
+\end{cases}
+\label{eq:ps-hierarchy}
+\end{equation}
+
+The redemption value is the most economically relevant figure; the
+others are accounting approximations of decreasing fidelity.
+
+\subsubsection{Book equity formula}
+
+Book equity is then
+\begin{equation}
+\mathrm{BE}_{i,t} = \mathrm{SE}_{i,t} + \mathrm{txditc}_{i,t} - \mathrm{PS}_{i,t},
+\label{eq:be-defn}
+\end{equation}
+where \texttt{txditc} (deferred taxes plus investment tax credits) is
+added back as part of equity per the
+\cite{DavisFamaFrench2000} convention. Missing \texttt{txditc} is
+treated as zero.
+
+We retain only \(\mathrm{BE}_{i,t} > 0\); negative book equity is not
+economically meaningful for valuation ratios and we assign \texttt{NaN}
+in such cases. Approximately 0.5--1.5\% of firm-years have negative book
+equity in the modern sample; these are dropped from value-characteristic
+computations but retained for the panel (other characteristics are
+unaffected).
+
+\subsection{Point-in-Time (PIT) Mechanics}
+\label{subsec:stage0-pit}
+
+\subsubsection{The PIT requirement}
+
+A factor signal at month \(t\) must be computable using \emph{only}
+information that would have been available to a real investor at time
+\(t\). Violation of this rule (\emph{look-ahead bias}) inflates
+backtested performance because the model effectively peeks at future
+data.
+
+For market data (CRSP daily and monthly), the PIT timestamp is the
+trade date itself: a price for 2015-06-30 was knowable at 2015-06-30.
+For accounting data (Compustat), there is a structural lag between the
+fiscal year-end (when the data refers to) and the publication date
+(when investors learn the data). The standard academic convention,
+following Fama-French, is a \emph{6-month lag}.
+
+\subsubsection{The 6-month lag}
+
+For a fiscal year ending on \texttt{datadate}, we set the data's
+"available date" to
+\begin{equation}
+\mathrm{avail\_date}_{i,t} = \mathrm{datadate}_{i,t} +
+                              \text{6 months, rounded to month-end}.
+\label{eq:avail-date}
+\end{equation}
+
+This is a conservative bound. Empirically, most 10-K filings occur
+3--4 months after fiscal year-end, but tail cases (extension filings,
+restatements, smaller firms) can extend to 5--6 months. The 6-month
+convention ensures that a filing was almost certainly public by
+\texttt{avail\_date}. For a fiscal year ending 2014-12-31, the avail
+date is 2015-06-30; the data is usable starting from the 2015-06-30
+panel snapshot.
+
+A more aggressive lag (e.g., 3 months) would slightly improve the
+freshness of accounting data at the cost of risking forward-leakage in
+late-filing firms. The 6-month convention has decades of academic use
+and matches the CPZ benchmark, so we adopt it without modification.
+
+\subsubsection{Merge methodology: \texttt{pandas.merge\_asof}}
+
+The CRSP monthly panel and the Compustat panel have different time
+indices. CRSP is observed at every month-end; Compustat is observed at
+each firm's fiscal year-end (which can be any month). We need to merge
+the most recent available Compustat record into each CRSP month-end
+observation, separately for each firm.
+
+\texttt{pandas.merge\_asof} implements this directly. For each
+permno-date pair in the panel, it finds the most recent Compustat
+observation for that permno where \texttt{avail\_date} \(\le\) panel
+date, then attaches that record's columns. Crucially, this is a
+\emph{backward}-direction merge: it only uses information from the
+past, never the future.
+
+\subsubsection{The \texttt{tolerance} parameter and the 380-day choice}
+
+\texttt{merge\_asof} allows a maximum staleness via the \texttt{tolerance}
+argument. If no Compustat record within the tolerance window exists for
+a given firm-month, the merge yields NA for the accounting columns.
+
+We set \texttt{tolerance} to 380 days. Justification:
+
+\begin{itemize}
+\item Accounting data is annual. The expected gap between consecutive
+      \texttt{avail\_date} entries for a firm is 12 months
+      (\(\sim\)365 days).
+\item A small slack above 365 days accommodates fiscal-year-end shifts
+      and irregular reporting schedules: a firm changing its fiscal
+      year may have one 11-month and one 13-month gap, but consecutive
+      gaps over 380 days would imply skipping an annual filing entirely.
+\item 380 days is approximately 12.5 months. Larger tolerances
+      (e.g., 548 days $\approx$ 18 months, used in some research
+      pipelines) would let an 18-month-old filing populate a current
+      month, which is too stale to be informative for valuation.
+\item This choice forces firms with missed filings (typically firms
+      under SEC enforcement actions or in financial distress) to drop
+      out of the panel until they file again. This is the correct
+      behavior: such firms have impaired information transparency and
+      a real investor would not trade them on stale data.
+\end{itemize}
+
+\subsubsection{Audit fix 1: tolerance from 548 to 380 days}
+
+An earlier v1 implementation used \texttt{tolerance = 548 days}. This
+allowed accounting data up to 18 months stale to populate a current
+month. The fix to 380 days shortens this window to a more appropriate
+12.5 months, dropping stale-data firm-months that would otherwise
+contaminate value and profitability characteristics.
+
+\subsubsection{PIT correctness audit}
+
+We perform an explicit PIT audit on the merged panel: for each
+firm-month, we verify that the merged \texttt{datadate} satisfies
+\(\mathrm{datadate}\) + 6 months
+$\le$ panel date $<$
+\(\mathrm{datadate}\) + 380 days. Any violation triggers a hard error,
+not a warning. The audit is implemented in
+\texttt{src/data\_reconstruction/pit/audit.py} and runs in the test
+suite.
+
+\subsection{The Other Two Audit Fixes}
+\label{subsec:stage0-audit-fixes}
+
+In addition to the merge\_asof tolerance reduction
+(\S\ref{subsec:stage0-pit}), v1 implementation revealed two
+construction bugs that v2 retains as fixes.
+
+\subsubsection{Audit fix 2: AC (Total Accruals) without \texttt{fillna(0)}}
+
+Total Accruals (AC) following \cite{RichardsonSloanSoliman2005} is
+defined as
+\begin{equation}
+\mathrm{AC}_{i,t} = \frac{\mathrm{NOA}_{i,t} - \mathrm{NOA}_{i,t-1}}
+                          {\mathrm{AT}_{i,t-1}},
+\label{eq:ac-correct}
+\end{equation}
+
+where NOA is Net Operating Assets. The denominator \(\mathrm{AT}_{i,t-1}\)
+must be available, which requires both:
+\begin{enumerate}
+\item Current and prior-period NOA are computable, and
+\item \(\mathrm{AT}_{i,t-2}\) (used to scale prior NOA) is non-missing.
+\end{enumerate}
+
+A v1 bug applied \texttt{NOA.fillna(0)} on the prior-period NOA term.
+This produced spurious AC values for first-observation firms and firms
+with missing \texttt{at\_lag2}: the formula effectively reduced to
+\(\mathrm{AC}_{i,t} = \mathrm{NOA}_{i,t} \cdot
+\mathrm{at\_lag1}_{i,t} / \mathrm{at\_lag1}_{i,t}\), which is just
+the level of NOA, not its change.
+
+The v2 fix returns NA when either prior NOA term is unavailable, letting
+the completeness filter drop those firm-months instead of imputing a
+fake value.
+
+\subsubsection{Audit fix 3: \texttt{Rel2High} uses split-adjusted price}
+
+\(\mathrm{Rel2High}\) per \cite{GeorgeHwang2004} is the ratio of current
+price to its 52-week (12-month) high:
+\begin{equation}
+\mathrm{Rel2High}_{i,t}
+   = \frac{\mathrm{prc}^{\mathrm{adj}}_{i,t}}{
+       \max_{s \in [t-12, t-1]} \mathrm{prc}^{\mathrm{adj}}_{i,s}}.
+\label{eq:rel2high-defn}
+\end{equation}
+
+The v1 bug used raw, unadjusted prices. When a stock undergoes a stock
+split during the lookback window (e.g., 2-for-1), the pre-split prices
+are 2x larger than post-split prices, producing a 12-month "high" that
+the post-split price cannot exceed. The result is a Rel2High value of
+0.5 driven entirely by the split, not by price weakness.
+
+The fix uses split-adjusted prices throughout:
+\begin{equation}
+\mathrm{prc}^{\mathrm{adj}}_{i,t} = \frac{|\mathrm{prc}_{i,t}|}{\mathrm{cfacpr}_{i,t}},
+\label{eq:price-adjustment}
+\end{equation}
+
+where \texttt{cfacpr} is CRSP's cumulative price-adjustment factor.
+After this adjustment, all prices are on a single comparable scale and
+splits do not contaminate the rolling maximum.
+
+\subsection{Roll (1984) Implied Bid-Ask Spread}
+\label{subsec:stage0-roll}
+
+The bid-ask spread \(\mathrm{Spread}_{i,t}\) is required as a liquidity
+characteristic. Direct bid-ask quote data is unavailable in CRSP for
+NYSE/AMEX stocks before 1983 and for NASDAQ before 1993. To maintain
+coverage from 1967, we use the \cite{Roll1984} implied spread
+estimator, which infers spread from the serial covariance of daily
+returns.
+
+\subsubsection{Derivation}
+
+Roll's estimator rests on a specific market-microstructure model. Assume
+the true (unobserved) price \(p^*_t\) follows a random walk with no
+drift, and the observed price \(p_t\) is the true price plus a buy-sell
+indicator scaled by half the bid-ask spread:
+\begin{equation}
+p_t = p^*_t + \tfrac{1}{2} s \cdot q_t,
+\quad q_t \in \{-1, +1\},
+\quad q_t \stackrel{\mathrm{iid}}{\sim} \text{Bernoulli}(0.5).
+\label{eq:roll-model}
+\end{equation}
+
+The observed return is
+\begin{equation}
+r_t = p_t - p_{t-1} = (p^*_t - p^*_{t-1}) + \tfrac{1}{2} s (q_t - q_{t-1}).
+\end{equation}
+
+Computing the lag-1 autocovariance of \(r_t\):
+\begin{align}
+\mathrm{Cov}(r_t, r_{t-1})
+&= \mathrm{Cov}\left(\tfrac{1}{2} s (q_t - q_{t-1}),
+                    \tfrac{1}{2} s (q_{t-1} - q_{t-2})\right) \notag\\
+&= \tfrac{1}{4} s^2 \mathrm{Cov}(q_t - q_{t-1}, q_{t-1} - q_{t-2}) \notag\\
+&= \tfrac{1}{4} s^2 \cdot (-1) \notag\\
+&= -\tfrac{1}{4} s^2.
+\label{eq:roll-cov}
+\end{align}
+
+Solving for \(s\):
+\begin{equation}
+s = 2 \sqrt{-\mathrm{Cov}(r_t, r_{t-1})}.
+\label{eq:roll-spread}
+\end{equation}
+
+This is the Roll (1984) estimator. It is well-defined only when the
+sample covariance is negative; positive covariance can arise from
+trending markets or noise and renders the estimator inapplicable.
+
+\subsubsection{Implementation}
+
+For each firm-month, we compute the daily-return autocovariance over
+that month's daily observations:
+\begin{equation}
+\widehat{\mathrm{Spread}}_{i,t} =
+\begin{cases}
+2 \sqrt{-\widehat{\gamma}_1(r_{i,t})}, &
+   \text{if } \widehat{\gamma}_1(r_{i,t}) < 0
+   \text{ and } |\mathcal{D}_{i,t}| \ge 10 \\
+0, & \text{if } \widehat{\gamma}_1(r_{i,t}) \ge 0 \\
+\text{NA}, & \text{otherwise.}
+\end{cases}
+\label{eq:roll-impl}
+\end{equation}
+
+Here \(\widehat{\gamma}_1\) denotes the lag-1 sample autocovariance and
+\(\mathcal{D}_{i,t}\) is the set of valid daily-return observations
+within firm-month \((i,t)\). We require at least 10 daily observations
+to ensure the autocovariance estimate is stable.
+
+A nonnegative autocovariance is set to a spread of zero rather than NA
+because the estimator structurally cannot accommodate this case but the
+firm-month is otherwise observed and tradable. Roll spread is therefore
+non-negative by construction.
+
+\subsubsection{Limitations}
+
+Roll spread is a noisy proxy. \cite{Goyenko2009} document that it
+captures the true effective spread less reliably than alternatives like
+the Effective Tick estimator or High-Low spread, particularly for
+illiquid stocks. We use Roll because it is the only estimator available
+on the full 1963--2024 daily sample without separate quote data;
+post-1993 sensitivity analyses can replace it with effective spread for
+robustness checks but are not required for the core panel.
+
+\subsection{Rank Normalization}
+\label{subsec:stage0-rank-norm}
+
+After all 46 raw characteristics are computed and merged onto the
+monthly panel, we cross-sectionally rank-normalize each characteristic
+to a common scale. This is the final step before output.
+
+\subsubsection{Definition}
+
+For characteristic \(f\) at date \(t\), let \(N_t\) be the number of
+firms with non-missing observations of \(f\) at date \(t\). For each
+firm \(i\) with rank \(R_{i,t,f}\) (in ascending order, ties averaged):
+\begin{equation}
+z_{i,t,f} = \frac{R_{i,t,f}}{N_t + 1} - \tfrac{1}{2}.
+\label{eq:rank-norm}
+\end{equation}
+
+This places \(z_{i,t,f}\) in the open interval
+\((-1/2, 1/2)\). The smallest non-missing observation maps to
+approximately \(-1/2 + 1/(N_t+1)\); the largest maps to approximately
+\(1/2 - 1/(N_t+1)\).
+
+\subsubsection{Why rank normalize?}
+
+Rank normalization confers four properties critical to factor analysis:
+
+\textbf{(1) Scale invariance.} Different characteristics are measured
+in different units (BEME is unitless; AT is log dollars; Beta is
+unitless but bounded near \(\pm 3\)). Rank-normalization places all
+factors on a single bounded scale, making them comparable across families
+and combinable in any composite signal without arbitrary rescaling.
+
+\textbf{(2) Outlier resistance.} Heavy-tailed financial data
+(e.g., extreme value ratios from low-ME stocks) would dominate
+weighted combinations if used in raw form. Rank normalization caps any
+observation's influence at \(1/2\), eliminating outlier dominance.
+
+\textbf{(3) Cross-sectional standardization within month.}
+Equation~\eqref{eq:rank-norm} is computed independently per month \(t\).
+This removes time-series drift in characteristic levels (e.g., long-run
+changes in average leverage) while preserving cross-sectional rankings
+within each month. The factor signal is therefore "high BEME relative
+to other firms this month" rather than "high BEME on an absolute scale."
+
+\textbf{(4) Compatibility with downstream methods.} Stage 4's
+combination methods (PCA, regression, etc.) all expect inputs on
+comparable scales. Rank-normalized characteristics satisfy this
+without further preprocessing.
+
+\subsubsection{Comparison to z-scoring}
+
+An alternative is cross-sectional standardization (z-scoring):
+\begin{equation}
+z_{i,t,f} = \frac{x_{i,t,f} - \overline{x}_{t,f}}{\sigma_{t,f}}.
+\end{equation}
+
+Z-scoring preserves the shape of the distribution, while rank-normalization
+imposes a uniform shape regardless of input. For factor analysis with
+heavy-tailed inputs (which most firm characteristics are), the uniformity
+of rank-normalization is preferable; CPZ and FNW both follow this
+convention. We adopt rank-normalization to match.
+
+\subsection{Completeness Filter}
+\label{subsec:stage0-completeness}
+
+The CPZ panel applies a strict universe rule: a firm-month is retained
+in the panel only if \emph{all 46 characteristics} are simultaneously
+non-missing.
+
+\begin{equation}
+(i, t) \in \mathcal{U}_{\text{CPZ}}
+\iff
+z_{i,t,f} \neq \text{NA} \quad \forall f \in \{1, \ldots, 46\}.
+\label{eq:completeness-filter}
+\end{equation}
+
+This is restrictive. A firm with missing Compustat data for any one
+fiscal year drops out of the panel for that year. Most missingness
+arises from short Compustat history (newly-public firms) or filing
+gaps (firms in financial distress).
+
+The filter has two consequences. First, the panel is balanced in the
+sense that every firm-month has every factor; downstream stages do not
+need to handle factor missingness. Second, the panel is biased toward
+firms with longer accounting histories; very small or recently-IPO'd
+firms are underrepresented. Stage 1 universe filters can choose to
+mitigate or amplify this depending on the desired research universe.
+
+We apply the filter \emph{before} rank-normalization, so that ranks are
+computed on the filtered universe. Rank-normalizing first and then
+filtering would produce ranks computed on a larger but inconsistent
+sample, contaminating the cross-sectional standardization.
+
+\subsection{The Final Panel: Schema}
+\label{subsec:stage0-schema}
+
+The output of Stage 0 is a single panel saved as Parquet (split into
+train/valid/test for ML convenience but otherwise contiguous). One row
+per (\texttt{permno}, \texttt{date}) pair satisfying the completeness
+filter.
+
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{permno} & int64 & CRSP permanent security identifier \\
+\texttt{date} & datetime & Month-end date \\
+\texttt{ret} & float64 & Raw monthly return (post-Shumway) \\
+\texttt{ret\_excess} & float64 & Excess return ($r_{i,t} - r_{f,t}$) \\
+\texttt{me} & float64 & Market equity, dollars \\
+\texttt{prc} & float64 & Closing price (signed CRSP value) \\
+\texttt{shrout} & float64 & Shares outstanding (thousands) \\
+\texttt{ticker} & string & Current ticker symbol \\
+\texttt{ticker\_current} & string & Most recent ticker for permno (for Stage 10) \\
+\texttt{exchcd} & int8 & Exchange code (1=NYSE, 2=AMEX, 3=NASDAQ) \\
+\texttt{siccd} & int32 & SIC industry code \\
+\texttt{shrcd} & int8 & Share code \\
+\texttt{datadate} & datetime & Compustat fiscal year-end (PIT audit) \\
+\texttt{avail\_date} & datetime & Earliest panel date for accounting data \\
+\midrule
+\multicolumn{3}{l}{46 rank-normalized characteristic columns:} \\
+\texttt{BEME, E2P, ...} & float64 & In open interval $(-1/2, 1/2)$ \\
+\bottomrule
+\end{tabular}
+\caption{Stage 0 final panel schema. Approximately 1.6M rows over
+1967--2024.}
+\label{tab:stage0-schema}
+\end{table}
+
+\subsection{Summary of Methodological Choices}
+\label{subsec:stage0-rationale-summary}
+
+The methodological choices in Stage 0 are summarized in
+Table~\ref{tab:stage0-rationale}. Each choice has a published
+academic basis and is empirically validated in Stage 0 Document 3
+(forthcoming).
+
+\begin{table}[!ht]
+\centering
+\small
+\begin{tabular}{p{5cm}p{5cm}p{4cm}}
+\toprule
+\textbf{Choice} & \textbf{Convention} & \textbf{Reference} \\
+\midrule
+Reference panel & CPZ extended factor panel & \cite{ChenPelgerZhu2024} \\
+Characteristic definitions & FNW (46 characteristics) & \cite{FreybergerNeuhierlWeber2020} \\
+Book equity formula & Davis-Fama-French (2000) hierarchy & \cite{DavisFamaFrench2000} \\
+Delisting return imputation & Shumway (1997) by exchange & \cite{Shumway1997} \\
+Accounting data lag & 6-month from fiscal year-end & \cite{FamaFrench1993} convention \\
+Merge tolerance & 380 days (12.5 months) & v1 audit fix \\
+Bid-ask spread proxy & Roll (1984) implied spread & \cite{Roll1984} \\
+Cross-sectional scaling & Rank-normalize to $(-1/2, 1/2)$ & CPZ/FNW convention \\
+Universe filter & All 46 chars non-missing & CPZ convention \\
+Audit fix 2: AC formula & No \texttt{fillna(0)} on lagged NOA & v1 audit fix \\
+Audit fix 3: Rel2High & Split-adjusted prices & v1 audit fix \\
+\bottomrule
+\end{tabular}
+\caption{Stage 0 methodological choices and their academic basis.}
+\label{tab:stage0-rationale}
+\end{table}
+
+\subsection{Document 1 Conclusion}
+
+Document 1 has established the methodological scaffolding for Stage 0:
+data sources, point-in-time mechanics, key adjustments (Shumway
+delisting, book equity, audit fixes), and the rank-normalization
+that delivers the final panel. It does not yet specify the 46
+characteristic formulas; that is the content of Document 2. Validation
+methodology (CPZ comparison, Fama-French replication) is detailed in
+Document 3.
+
+The methodological choices in this document are tightly anchored to
+published academic conventions, and the audit fixes are documented with
+their mathematical justifications. Implementation can proceed once
+Documents 2 and 3 are also approved.

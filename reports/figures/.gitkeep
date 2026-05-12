@@ -1,0 +1,2 @@
+# Figures directory. PNG outputs from notebooks go here and are referenced
+# from LaTeX via \includegraphics[...]{figures/filename.png}.

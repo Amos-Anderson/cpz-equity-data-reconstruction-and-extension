@@ -1,0 +1,140 @@
+\documentclass[11pt,letterpaper]{report}
+
+% ============================================================
+% Packages
+% ============================================================
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{natbib}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Hyperref styling
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!70!black,
+}
+
+% Bibliography style
+\bibliographystyle{apalike}
+
+% Theorem environments
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{proposition}{Proposition}[chapter]
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{lemma}{Lemma}[chapter]
+\newtheorem{remark}{Remark}[chapter]
+\newtheorem{assumption}{Assumption}[chapter]
+
+% Custom notation commands (single source of truth)
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\Corr}{\operatorname{Corr}}
+\newcommand{\diag}{\operatorname{diag}}
+\newcommand{\tr}{\operatorname{tr}}
+\newcommand{\vectr}[1]{\boldsymbol{#1}}
+\newcommand{\mat}[1]{\boldsymbol{#1}}
+\newcommand{\T}{^{\top}}
+
+% Header/footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\onehalfspacing
+
+% ============================================================
+% Title
+% ============================================================
+\title{
+  \vspace{-1cm}
+  \textbf{An Industry-Grade Long/Short Fundamental Factor Investing Pipeline for US Equities} \\[0.5em]
+  \large Mathematical Framework, Implementation, and Empirical Results
+}
+\author{
+  Amos Anderson \\
+  \small Stony Brook University \\
+  \small AMS520 --- Machine Learning in Finance
+}
+\date{Spring 2026}
+
+% ============================================================
+% Document
+% ============================================================
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\noindent
+This report documents the end-to-end construction of a long/short fundamental
+factor investing pipeline for US equities, from raw CRSP and Compustat data
+through paper trading deployment on Alpaca. We build on the cross-sectional
+characteristics of \citet{chen2024deep}, extending their dataset through 2024,
+and organize the pipeline in eleven stages: universe construction, factor
+engineering, factor validation, signal combination, risk modeling, transaction
+cost modeling, portfolio construction, backtesting, attribution, deployment,
+and monitoring. A central methodological contribution is the portfolio risk
+model, which extends the BARRA-style cross-sectional factor decomposition
+$\Sigma = BFB\T + D$ with ARMA-GARCH dynamics on factor returns and Normal
+Inverse Gaussian innovations on idiosyncratic residuals. Every stage is
+documented with a formal mathematical problem statement, derivations,
+references to primary sources, and empirical validation. The pipeline is
+implemented as a modular Python package with per-stage notebooks, unit tests,
+and configuration artifacts.
+\end{abstract}
+
+\tableofcontents
+\clearpage
+
+% ============================================================
+% Main content
+% ============================================================
+\input{sections/00_introduction.tex}
+\input{sections/00_data_foundation.tex}
+\input{sections/01_universe.tex}
+\input{sections/02_factors.tex}
+\input{sections/03_validation.tex}
+\input{sections/04_alpha.tex}
+\input{sections/05_risk.tex}
+\input{sections/06_costs.tex}
+\input{sections/07_portfolio.tex}
+\input{sections/08_backtest.tex}
+\input{sections/09_attribution.tex}
+\input{sections/10_deployment.tex}
+\input{sections/11_monitoring.tex}
+\input{sections/12_discussion.tex}
+
+% ============================================================
+% Bibliography
+% ============================================================
+\bibliography{references}
+
+% ============================================================
+% Appendices
+% ============================================================
+\appendix
+\input{sections/appendix_notation.tex}
+\input{sections/appendix_proofs.tex}
+
+\end{document}

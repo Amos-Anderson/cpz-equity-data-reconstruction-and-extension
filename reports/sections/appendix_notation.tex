@@ -1,0 +1,37 @@
+\chapter{Notation}
+\label{app:notation}
+
+Table~\ref{tab:notation} summarizes notation used throughout the report.
+
+\begin{table}[H]
+\centering
+\caption{Notation reference.}
+\label{tab:notation}
+\small
+\begin{tabular}{ll}
+\toprule
+Symbol & Meaning \\
+\midrule
+$i$ & Stock index, $i = 1, \ldots, N_t$ \\
+$t$ & Time index (monthly unless noted) \\
+$k$ & Factor index, $k = 1, \ldots, K$ \\
+$r_{i,t}$ & Excess return of stock $i$ in period $t$ \\
+$z_{k,i,t}$ & Value of factor $k$ for stock $i$ at time $t$ (standardized) \\
+$B_{i,k,t}$ & Exposure of stock $i$ to factor $k$ at time $t$ \\
+$f_{k,t}$ & Return to factor $k$ in period $t$ \\
+$e_{i,t}$ & Idiosyncratic return of stock $i$ \\
+$\alpha_{i,t}$ & Expected excess return forecast for stock $i$ \\
+$w_{i,t}$ & Portfolio weight on stock $i$ at time $t$ \\
+$\vectr{w}_t$ & Portfolio weight vector at time $t$ \\
+$\mat{B}_t$ & Exposure matrix (stocks $\times$ factors) \\
+$\mat{F}_t$ & Factor covariance matrix \\
+$\mat{D}_t$ & Idiosyncratic variance matrix (diagonal) \\
+$\mat{\Sigma}_t$ & Portfolio covariance: $\mat{\Sigma}_t = \mat{B}_t \mat{F}_t \mat{B}_t\T + \mat{D}_t$ \\
+$U_t$ & Investable universe at time $t$ \\
+$\text{IC}_t$ & Cross-sectional information coefficient at $t$ \\
+$\lambda$ & Risk aversion parameter \\
+$G$ & Gross leverage \\
+TC & Transaction cost function \\
+\bottomrule
+\end{tabular}
+\end{table}

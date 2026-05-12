@@ -26,7 +26,7 @@ This package reconstructs a monthly panel of 46 fundamental characteristics from
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/data-construction.git
+git clone https://github.com/Amos-Anderson/cpz-equity-data-reconstruction-and-extension/tree/main/src/data_construction.git
 cd data-construction
 
 # Install dependencies
